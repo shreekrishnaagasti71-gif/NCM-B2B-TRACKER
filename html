@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>NCM Branch Operations</title>
+  <style>
+    :root{--red:#dc2626;--blue:#2563eb;--green:#16a34a;--ink:#172033;--muted:#64748b;--line:#e2e8f0;--soft:#f8fafc}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--soft);color:var(--ink);min-height:100vh;padding-bottom:76px}
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    .header{position:relative;background:#fff;border-bottom:1px solid var(--line);padding:17px 18px;text-align:center}
+    .header h1{font-size:20px;color:var(--red);letter-spacing:.4px}
+    .header p{font-size:11px;color:var(--muted);margin-top:3px}
+    .clock{position:absolute;right:12px;top:13px;color:var(--blue);font:800 12px monospace;text-align:right}
+    .clock small{display:block;color:var(--muted);font:600 9px Segoe UI,Arial}
+    .container{max-width:620px;margin:auto;padding:14px}
+    .hidden{display:none!important}
+    .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 7px #0f172a08}
+    .card h2,.card h3,.card h4{margin-bottom:11px}
+    .card h3{font-size:15px}.card h4{font-size:13px;text-transform:uppercase;letter-spacing:.4px}
+    .muted{color:var(--muted);font-size:12px;line-height:1.45}
+    label{display:block;color:var(--muted);font-weight:700;font-size:12px;margin:11px 0 5px}
+    input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:9px;padding:11px;background:#fff;color:var(--ink);font-size:14px}
+    input:focus,select:focus,textarea:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px #2563eb18}
+    textarea{min-height:86px;resize:vertical}
+    .btn{border:0;border-radius:9px;padding:12px 14px;font-size:13px;font-weight:800;transition:.15s}
+    .btn:active{transform:scale(.98)}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn-full{width:100%}
+    .btn-red{background:var(--red);color:#fff}
+    .btn-blue{background:var(--blue);color:#fff}
+    .btn-green{background:var(--green);color:#fff}
+    .btn-grey{background:#f1f5f9;color:#334155;border:1px solid #cbd5e1}
+    .btn-outline{background:#fff;color:var(--red);border:1.5px solid var(--red)}
+    .mt{margin-top:10px}
+    .row{display:flex;gap:9px;align-items:end}
+    .grow{flex:1}
+    .login{max-width:390px;margin:30px auto}
+    .login h2{text-align:center;font-size:19px}
+    .login input{text-align:center;font-size:20px;letter-spacing:4px}
+    .tabs{display:flex;gap:5px;background:#fff;border:1px solid var(--line);padding:4px;border-radius:11px;margin-bottom:13px}
+    .tab{flex:1;border:0;background:transparent;color:var(--muted);border-radius:8px;padding:10px 5px;font-size:12px;font-weight:800}
+    .tab.active{background:var(--red);color:#fff}
+    .topbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px}
+    .identity{font-size:12px;color:var(--muted)}
+    .identity b{color:var(--red);font-size:14px}
+    .announcement{border:1px solid #fed7aa;background:#fff7ed;border-left:5px solid #f97316;border-radius:10px;padding:12px;margin:9px 0}
+    .announcement .a-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:800;color:#9a3412}
+    .announcement .a-body{font-size:14px;line-height:1.45;margin-top:7px;white-space:pre-wrap}
+    .announcement .a-foot{font-size:10px;color:#78716c;margin-top:8px}
+    .empty{text-align:center;color:#94a3b8;padding:18px 8px;font-size:13px}
+    .branch-contact{border:1px solid var(--line);border-radius:11px;padding:12px;margin:9px 0;background:#fff}
+    .branch-contact h4{font-size:14px;color:var(--blue);margin-bottom:6px}
+    .contact-line{font-size:13px;margin-top:4px}
+    .contact-line a{color:var(--blue);font-weight:700;text-decoration:none}
+    .badge{display:inline-block;border-radius:999px;padding:3px 8px;font-size:10px;font-weight:800;background:#dbeafe;color:#1d4ed8}
+    .badge.green{background:#dcfce7;color:#166534}
+    .badge.red{background:#fee2e2;color:#991b1b}
+    .badge.orange{background:#ffedd5;color:#9a3412}
+    .driver-status{border-radius:12px;padding:15px;background:#eff6ff;border:1.5px solid #93c5fd;margin-top:12px}
+    .driver-status.moving{background:#f0fdf4;border-color:#86efac}
+    .driver-status h3{font-size:18px;margin-bottom:5px}
+    .timer{font:800 27px monospace;color:var(--blue);margin:10px 0}
+    .moving .timer{color:var(--green)}
+    .branch-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+    .branch-choice{background:#fff;border:2px solid var(--line);border-radius:10px;padding:13px 6px;color:#475569;font-size:12px;font-weight:800}
+    .branch-choice.selected{background:var(--blue);border-color:var(--blue);color:#fff}
+    .toast{position:fixed;z-index:20;top:15px;left:50%;transform:translateX(-50%);display:none;max-width:90%;padding:12px 18px;border-radius:9px;color:#fff;font-weight:800;font-size:13px;box-shadow:0 5px 18px #0003;text-align:center}
+    .toast.ok{background:var(--green)}
+    .toast.bad{background:var(--red)}
+    .toast.warn{background:#ca8a04}
+    .bottom{position:fixed;z-index:10;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px}
+    .bottom b{color:var(--red)}
+    .build{position:fixed;bottom:4px;right:5px;color:#cbd5e1;font:9px monospace}
+    @media(max-width:420px){
+      .clock{position:static;text-align:center;margin-top:6px}
+      .row{flex-direction:column;align-items:stretch}
+      .row .btn{width:100%}
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>NCM BRANCH OPERATIONS</h1>
+    <p>Announcements · Branch contacts · Driver check-out</p>
+    <div class="clock" id="clock">--:--:--<small>--/--/----</small></div>
+  </header>
+
+  <div id="toast" class="toast"></div>
+
+  <main class="container">
+    <section id="setupCard" class="card hidden">
+      <h3>First-time setup</h3>
+      <p class="muted">Paste the deployed Google Apps Script URL ending in <b>/exec</b>.</p>
+      <input id="scriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      <button class="btn btn-blue btn-full mt" onclick="saveUrl()">Save and continue</button>
+    </section>
+
+    <section id="loginScreen" class="card login hidden">
+      <h2>Branch / Driver Login</h2>
+      <p class="muted" style="text-align:center">Use your assigned passcode.</p>
+
+      <input id="passcode"
+             type="password"
+             inputmode="numeric"
+             maxlength="12"
+             placeholder="Passcode"
+             onkeydown="if(event.key==='Enter') login()">
+
+      <button class="btn btn-red btn-full mt" onclick="login()">Login</button>
+    </section>
+
+    <section id="app" class="hidden">
+      <div class="topbar">
+        <div class="identity">
+          Signed in as <b id="identity">-</b><br>
+          <span id="role">-</span>
+        </div>
+        <button class="btn btn-grey" onclick="logout()">Logout</button>
+      </div>
+
+      <nav class="tabs">
+        <button class="tab active" id="tabDashboard" onclick="showTab('dashboard')">
+          Announcements
+        </button>
+
+        <button class="tab" id="tabContacts" onclick="showTab('contacts')">
+          Contacts
+        </button>
+
+        <button class="tab hidden" id="tabDriver" onclick="showTab('driver')">
+          Driver
+        </button>
+      </nav>
+
+      <section id="dashboardTab">
+        <div class="card">
+          <h3>📢 Today’s branch announcements</h3>
+          <p class="muted">
+            Announcements stay visible for 24 hours, then disappear automatically.
+          </p>
+
+          <div id="announcementList">
+            <div class="empty">Loading announcements…</div>
+          </div>
+        </div>
+
+        <div id="announcementFormCard" class="card">
+          <h3>Post an announcement</h3>
+          <p class="muted">
+            This message will expire automatically after 24 hours.
+          </p>
+
+          <label>Branch</label>
+          <select id="announcementBranch"></select>
+
+          <label>Message</label>
+          <textarea
+            id="announcementMessage"
+            maxlength="500"
+            placeholder="Example: B2B desk is handled by Ram today until 6 PM."
+          ></textarea>
+
+          <button
+            class="btn btn-full mt"
+            style="background:#f97316;color:#fff"
+            onclick="postAnnouncement()"
+          >
+            Publish for 24 hours
+          </button>
+        </div>
+      </section>
+
+      <section id="contactsTab" class="hidden">
+        <div class="card">
+          <h3>👤 B2B contact directory</h3>
+
+          <p class="muted">
+            Each branch can keep today’s responsible B2B person and contact
+            number here. If a name or number is wrong, edit and save it again.
+          </p>
+
+          <div id="contactList">
+            <div class="empty">Loading contacts…</div>
+          </div>
+        </div>
+
+        <div id="contactFormCard" class="card">
+          <h3>Update branch contact</h3>
+
+          <p class="muted">
+            Changes replace the previous contact for the selected branch.
+          </p>
+
+          <label>Branch</label>
+          <select id="contactBranch"></select>
+
+          <label>Responsible person</label>
+          <input id="contactName" maxlength="80" placeholder="Full name">
+
+          <label>Phone number</label>
+          <input id="contactPhone" maxlength="30" inputmode="tel" placeholder="98XXXXXXXX">
+
+          <label>Alternative number</label>
+          <input id="contactAltPhone" maxlength="30" inputmode="tel" placeholder="Optional">
+
+          <label>Note</label>
+          <textarea
+            id="contactNote"
+            maxlength="240"
+            placeholder="Shift time, desk location, or other useful detail"
+          ></textarea>
+
+          <button class="btn btn-blue btn-full mt" onclick="saveContact()">
+            Save / correct contact
+          </button>
+        </div>
+      </section>
+
+      <section id="driverTab" class="hidden">
+        <div class="card">
+          <h3>🚐 Driver check-in / check-out</h3>
+
+          <p class="muted">
+            All seven branches use the same rule. At check-out, type the next
+            branch name, for example <b>CHABAHIL</b>.
+          </p>
+
+          <label>Van number</label>
+
+          <div class="row">
+            <input id="driverVan" class="grow" placeholder="Example: 843">
+            <button class="btn btn-grey" onclick="changeDriverVan()">
+              Change van
+            </button>
+          </div>
+
+          <p class="muted mt">
+            Use “Change van” if you entered the wrong van number.
+          </p>
+
+          <div id="driverState" class="driver-status hidden"></div>
+        </div>
+
+        <div class="card">
+          <h3 id="driverActionTitle">Select your current branch</h3>
+
+          <p class="muted">
+            Tap the branch where the van is now to check in.
+          </p>
+
+          <div id="checkInBranches" class="branch-grid"></div>
+
+          <div id="checkoutArea" class="hidden">
+            <label>Next branch for check-out</label>
+
+            <input
+              id="nextBranch"
+              list="branchNames"
+              autocomplete="off"
+              placeholder="Type CHABAHIL or choose below"
+            >
+
+            <datalist id="branchNames"></datalist>
+
+            <div id="checkoutBranches" class="branch-grid"></div>
+
+            <button class="btn btn-red btn-full mt" onclick="driverCheckOut()">
+              Check out to this branch
+            </button>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer id="bottomBar" class="bottom hidden">
+    <span>Branch: <b id="bottomBranch">-</b></span>
+    <span id="onlineStatus">Online</span>
+  </footer>
+
+  <div class="build">v21-branch-ops</div>
+
+  <script>
+    const BRANCHES = [
+      "NAYA BUSPARK",
+      "BASUNDHARA",
+      "CHABAHIL",
+      "TINKUNE",
+      "SATDOBATO",
+      "KALANKI",
+      "SWOYAMBHU"
+    ];
+
+    let SCRIPT_URL = localStorage.getItem("ncm_url") || "";
+    let session = JSON.parse(localStorage.getItem("ncm_session") || "null");
+    let driverState = null;
+    let pollTimer = null;
+
+    const $ = id => document.getElementById(id);
+
+    const esc = value =>
+      String(value == null ? "" : value)
+        .replace(/[&<>"']/g, c => ({
+          "&":"&amp;",
+          "<":"&lt;",
+          ">":"&gt;",
+          '"':"&quot;",
+          "'":"&#39;"
+        }[c]));
+
+    const normalizeBranch = value => {
+      const v = String(value || "")
+        .toUpperCase()
+        .trim()
+        .replace(/\s+/g, " ");
+
+      return v === "CHABHIL" ? "CHABAHIL" : v;
+    };
+
+    const formatDate = value =>
+      value
+        ? new Date(value).toLocaleString("en-GB", {
+            timeZone:"Asia/Kathmandu",
+            day:"2-digit",
+            month:"2-digit",
+            hour:"2-digit",
+            minute:"2-digit"
+          })
+        : "-";
+
+    const formatSeconds = total => {
+      total = Math.max(0, Math.floor(Number(total) || 0));
+
+      return String(Math.floor(total / 3600)).padStart(2,"0") + ":" +
+             String(Math.floor(total % 3600 / 60)).padStart(2,"0") + ":" +
+             String(total % 60).padStart(2,"0");
+    };
+
+    function toast(message, type="ok") {
+      const el = $("toast");
+
+      el.textContent = message;
+      el.className = "toast " + type;
+      el.style.display = "block";
+
+      clearTimeout(el._timer);
+
+      el._timer = setTimeout(() => {
+        el.style.display = "none";
+      }, 3200);
+    }
+
+    function apiGet(params) {
+      const query = new URLSearchParams(
+        Object.assign({}, params, {
+          token: session && session.token || ""
+        })
+      );
+
+      return fetch(SCRIPT_URL + "?" + query.toString())
+        .then(response => response.json());
+    }
+
+    function apiPost(body) {
+      return fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type":"text/plain;charset=utf-8"
+        },
+        body: JSON.stringify(
+          Object.assign({}, body, {
+            token: session && session.token || ""
+          })
+        )
+      }).then(response => response.json());
+    }
+
+    function saveUrl() {
+      const url = $("scriptUrl").value.trim();
+
+      if (!/\/exec(?:\?|$)/.test(url)) {
+        return toast("Use the deployed URL ending in /exec", "bad");
+      }
+
+      localStorage.setItem("ncm_url", url);
+      SCRIPT_URL = url;
+      boot();
+    }
+
+    async function login() {
+      const passcode = $("passcode").value.trim();
+
+      if (!passcode) {
+        return toast("Enter your passcode", "bad");
+      }
+
+      try {
+        const result = await apiPost({
+          action:"login",
+          passcode
+        });
+
+        if (!result.success) {
+          return toast(result.error || "Login failed", "bad");
+        }
+
+        session = result.session;
+        localStorage.setItem("ncm_session", JSON.stringify(session));
+
+        showApp();
+      } catch (error) {
+        toast("Could not connect to Apps Script", "bad");
+      }
+    }
+
+    function logout() {
+      if (session && session.token) {
+        apiPost({action:"logout"}).catch(() => {});
+      }
+
+      localStorage.removeItem("ncm_session");
+      location.reload();
+    }
+
+    function fillBranchSelect(id, includeAll=false) {
+      const select = $(id);
+
+      if (!select) return;
+
+      select.innerHTML =
+        (includeAll ? '<option value="">Select branch</option>' : "") +
+        BRANCHES.map(branch =>
+          `<option value="${esc(branch)}">${esc(branch)}</option>`
+        ).join("");
+    }
+
+    function showApp() {
+      $("loginScreen").classList.add("hidden");
+      $("setupCard").classList.add("hidden");
+      $("app").classList.remove("hidden");
+      $("bottomBar").classList.remove("hidden");
+
+      const isDriver = session.role === "driver";
+      const isAdmin = session.role === "admin";
+
+      $("identity").textContent =
+        isDriver ? "DRIVER" : (session.branch || "ADMIN");
+
+      $("role").textContent =
+        String(session.role || "").toUpperCase();
+
+      $("bottomBranch").textContent =
+        isDriver ? "DRIVER" : (session.branch || "ADMIN");
+
+      $("tabDriver").classList.toggle(
+        "hidden",
+        !(isDriver || isAdmin)
+      );
+
+      $("announcementFormCard").classList.toggle(
+        "hidden",
+        isDriver
+      );
+
+      $("contactFormCard").classList.toggle(
+        "hidden",
+        isDriver
+      );
+
+      fillBranchSelect("announcementBranch", isAdmin);
+      fillBranchSelect("contactBranch", isAdmin);
+
+      if (!isAdmin && !isDriver) {
+        $("announcementBranch").value = session.branch;
+        $("contactBranch").value = session.branch;
+      }
+
+      if (isDriver) {
+        $("tabDriver").classList.remove("hidden");
+        showTab("driver");
+        initDriver();
+      } else {
+        showTab("dashboard");
+      }
+
+      loadAnnouncements();
+      loadContacts();
+    }
+
+    function showTab(tab) {
+      ["dashboard","contacts","driver"].forEach(name => {
+        $(name + "Tab").classList.toggle("hidden", name !== tab);
+      });
+
+      ["Dashboard","Contacts","Driver"].forEach(name => {
+        $("tab" + name).classList.toggle(
+          "active",
+          name.toLowerCase() === tab
+        );
+      });
+
+      if (tab === "driver") {
+        initDriver();
+      }
+    }
+
+    async function loadAnnouncements() {
+      try {
+        const result = await apiGet({
+          action:"getAnnouncements"
+        });
+
+        if (!result.success) {
+          throw Error(result.error);
+        }
+
+        const list = $("announcementList");
+        const rows = result.data || [];
+
+        list.innerHTML = rows.length
+          ? rows.map(a => `
+              <article class="announcement">
+                <div class="a-head">
+                  <span>${esc(a.branch)}</span>
+                  <span class="badge orange">24 HOUR</span>
+                </div>
+
+                <div class="a-body">${esc(a.message)}</div>
+
+                <div class="a-foot">
+                  Posted by ${esc(a.createdBy || a.branch)}
+                  · expires ${formatDate(a.expiresAt)}
+                </div>
+              </article>
+            `).join("")
+          : '<div class="empty">No active announcements.</div>';
+      } catch (error) {
+        $("announcementList").innerHTML =
+          '<div class="empty">Announcements unavailable.</div>';
+      }
+    }
+
+    async function postAnnouncement() {
+      const message = $("announcementMessage").value.trim();
+      const branch = normalizeBranch($("announcementBranch").value);
+
+      if (!branch || !BRANCHES.includes(branch)) {
+        return toast("Choose a branch", "bad");
+      }
+
+      if (!message) {
+        return toast("Write the announcement first", "bad");
+      }
+
+      try {
+        const result = await apiPost({
+          action:"createAnnouncement",
+          branch,
+          message
+        });
+
+        if (!result.success) {
+          return toast(result.error || "Could not publish", "bad");
+        }
+
+        $("announcementMessage").value = "";
+        toast("Announcement published for 24 hours");
+        loadAnnouncements();
+      } catch (error) {
+        toast("Network error", "bad");
+      }
+    }
+
+    async function loadContacts() {
+      try {
+        const result = await apiGet({
+          action:"getContacts"
+        });
+
+        if (!result.success) {
+          throw Error(result.error);
+        }
+
+        const contacts = result.data || [];
+
+        window._contacts = {};
+        contacts.forEach(contact => {
+          window._contacts[contact.branch] = contact;
+        });
+
+        $("contactList").innerHTML = BRANCHES.map(branch => {
+          const contact =
+            contacts.find(item => item.branch === branch) || {};
+
+          return `
+            <article class="branch-contact">
+              <h4>
+                ${esc(branch)}
+                ${
+                  contact.name
+                    ? '<span class="badge green">UPDATED</span>'
+                    : '<span class="badge">NO CONTACT YET</span>'
+                }
+              </h4>
+
+              ${
+                contact.name
+                  ? `
+                    <div class="contact-line">
+                      <b>${esc(contact.name)}</b>
+                    </div>
+
+                    <div class="contact-line">
+                      ☎
+                      <a href="tel:${esc(contact.phone)}">
+                        ${esc(contact.phone)}
+                      </a>
+
+                      ${
+                        contact.altPhone
+                          ? `
+                            ·
+                            <a href="tel:${esc(contact.altPhone)}">
+                              ${esc(contact.altPhone)}
+                            </a>
+                          `
+                          : ""
+                      }
+                    </div>
+
+                    ${
+                      contact.note
+                        ? `
+                          <div class="contact-line muted">
+                            ${esc(contact.note)}
+                          </div>
+                        `
+                        : ""
+                    }
+
+                    <div class="muted" style="margin-top:6px">
+                      Updated ${formatDate(contact.updatedAt)}
+                    </div>
+                  `
+                  : '<div class="muted">No responsible person has been added.</div>'
+              }
+
+              ${
+                session.role === "admin" || session.branch === branch
+                  ? `
+                    <button
+                      class="btn btn-grey mt"
+                      onclick="editContact('${esc(branch)}')"
+                    >
+                      Edit this contact
+                    </button>
+                  `
+                  : ""
+              }
+            </article>
+          `;
+        }).join("");
+      } catch (error) {
+        $("contactList").innerHTML =
+          '<div class="empty">Contacts unavailable.</div>';
+      }
+    }
+
+    function editContact(branch) {
+      $("contactBranch").value = branch;
+
+      const contact =
+        window._contacts && window._contacts[branch];
+
+      if (contact) {
+        $("contactName").value = contact.name || "";
+        $("contactPhone").value = contact.phone || "";
+        $("contactAltPhone").value = contact.altPhone || "";
+        $("contactNote").value = contact.note || "";
+      }
+
+      $("contactsTab").scrollIntoView({
+        behavior:"smooth"
+      });
+    }
+
+    async function saveContact() {
+      const branch = normalizeBranch($("contactBranch").value);
+      const name = $("contactName").value.trim();
+      const phone = $("contactPhone").value.trim();
+
+      if (!branch || !BRANCHES.includes(branch)) {
+        return toast("Choose a branch", "bad");
+      }
+
+      if (!name || !phone) {
+        return toast("Name and phone are required", "bad");
+      }
+
+      try {
+        const result = await apiPost({
+          action:"saveContact",
+          branch,
+          name,
+          phone,
+          altPhone:$("contactAltPhone").value.trim(),
+          note:$("contactNote").value.trim()
+        });
+
+        if (!result.success) {
+          return toast(result.error || "Could not save contact", "bad");
+        }
+
+        toast("Contact saved / corrected");
+        loadContacts();
+      } catch (error) {
+        toast("Network error", "bad");
+      }
+    }
+
+    function initDriver() {
+      if (session.role !== "driver" && session.role !== "admin") {
+        return;
+      }
+
+      $("driverVan").value =
+        localStorage.getItem("ncm_driver_van") || "";
+
+      $("checkInBranches").innerHTML = BRANCHES.map(branch =>
+        `
+          <button
+            class="branch-choice"
+            onclick="selectCheckIn('${esc(branch)}')"
+          >
+            ${esc(branch)}
+          </button>
+        `
+      ).join("");
+
+      $("branchNames").innerHTML = BRANCHES.map(branch =>
+        `<option value="${esc(branch)}">`
+      ).join("");
+
+      loadDriverState();
+
+      clearInterval(pollTimer);
+      pollTimer = setInterval(loadDriverState, 10000);
+    }
+
+    async function loadDriverState() {
+      const vanNo =
+        $("driverVan").value.trim() ||
+        localStorage.getItem("ncm_driver_van") ||
+        "";
+
+      if (!vanNo) {
+        renderDriverState(null);
+        return;
+      }
+
+      localStorage.setItem("ncm_driver_van", vanNo);
+
+      try {
+        const result = await apiGet({
+          action:"getDriverState",
+          vanNo
+        });
+
+        if (result.success) {
+          driverState = result.state;
+          renderDriverState(driverState);
+        }
+      } catch (error) {
+        $("driverActionTitle").textContent =
+          "Offline — enter your branch when connected";
+      }
+    }
+
+    function changeDriverVan() {
+      const van = $("driverVan").value.trim();
+
+      if (!van) {
+        return toast("Enter the correct van number", "bad");
+      }
+
+      localStorage.setItem("ncm_driver_van", van);
+      driverState = null;
+      loadDriverState();
+
+      toast("Van number changed");
+    }
+
+    function selectCheckIn(branch) {
+      $("driverVan").value = $("driverVan").value.trim();
+
+      if (!$("driverVan").value) {
+        return toast("Enter van number first", "bad");
+      }
+
+      driverCheckIn(branch);
+    }
+
+    async function driverCheckIn(branch) {
+      const vanNo = $("driverVan").value.trim();
+
+      if (!vanNo) {
+        return toast("Enter van number first", "bad");
+      }
+
+      try {
+        const result = await apiPost({
+          action:"driverCheckIn",
+          vanNo,
+          branch:normalizeBranch(branch)
+        });
+
+        if (!result.success) {
+          return toast(result.error || "Check-in failed", "bad");
+        }
+
+        localStorage.setItem("ncm_driver_van", vanNo);
+        driverState = result.state;
+        renderDriverState(driverState);
+
+        toast(result.message || "Checked in");
+      } catch (error) {
+        toast("Network error", "bad");
+      }
+    }
+
+    function pickNext(branch, button) {
+      $("nextBranch").value = branch;
+
+      document
+        .querySelectorAll("#checkoutBranches .branch-choice")
+        .forEach(item => item.classList.remove("selected"));
+
+      if (button) {
+        button.classList.add("selected");
+      }
+    }
+
+    async function driverCheckOut() {
+      const vanNo = $("driverVan").value.trim();
+      const nextBranch = normalizeBranch($("nextBranch").value);
+
+      if (!vanNo) {
+        return toast("Enter van number first", "bad");
+      }
+
+      if (!BRANCHES.includes(nextBranch)) {
+        return toast("Type a valid branch name", "bad");
+      }
+
+      try {
+        const result = await apiPost({
+          action:"driverCheckOut",
+          vanNo,
+          nextBranch
+        });
+
+        if (!result.success) {
+          return toast(result.error || "Check-out failed", "bad");
+        }
+
+        driverState = result.state;
+        renderDriverState(driverState);
+
+        toast(result.message || "Checked out");
+      } catch (error) {
+        toast("Network error", "bad");
+      }
+    }
+
+    function renderDriverState(state) {
+      const box = $("driverState");
+      const action = $("driverActionTitle");
+      const checkIn = $("checkInBranches");
+      const checkout = $("checkoutArea");
+
+      if (!state || !state.started) {
+        box.classList.add("hidden");
+        action.textContent = "Select your current branch";
+        checkIn.classList.remove("hidden");
+        checkout.classList.add("hidden");
+        return;
+      }
+
+      box.classList.remove("hidden");
+      checkIn.classList.add("hidden");
+
+      if (state.status === "MOVING") {
+        box.className = "driver-status moving";
+
+        box.innerHTML = `
+          <h3>Heading to ${esc(state.nextBranch)}</h3>
+          <p class="muted">Check in when you arrive.</p>
+          <div class="timer">${formatSeconds(state.elapsedSeconds)}</div>
+          <span class="badge green">
+            MOVING · ROUND ${esc(state.round)}
+          </span>
+        `;
+
+        action.textContent =
+          "Next check-in: " + state.nextBranch;
+
+        checkout.classList.add("hidden");
+      } else {
+        box.className = "driver-status";
+
+        box.innerHTML = `
+          <h3>At ${esc(state.branch)}</h3>
+          <p class="muted">
+            Choose the next branch and check out when leaving.
+          </p>
+          <div class="timer">${formatSeconds(state.elapsedSeconds)}</div>
+          <span class="badge green">
+            AT BRANCH · ROUND ${esc(state.round)}
+          </span>
+        `;
+
+        action.textContent =
+          "Check out from " + state.branch;
+
+        checkout.classList.remove("hidden");
+
+        const options = BRANCHES.filter(
+          branch => branch !== state.branch
+        );
+
+        $("checkoutBranches").innerHTML = options.map(branch =>
+          `
+            <button
+              class="branch-choice"
+              onclick="pickNext('${esc(branch)}', this)"
+            >
+              ${esc(branch)}
+            </button>
+          `
+        ).join("");
+      }
+    }
+
+    function updateClock() {
+      const now = new Date();
+
+      $("clock").innerHTML =
+        now.toLocaleTimeString("en-GB", {
+          timeZone:"Asia/Kathmandu",
+          hour12:false
+        }) +
+        "<small>" +
+        now.toLocaleDateString("en-GB", {
+          timeZone:"Asia/Kathmandu"
+        }) +
+        "</small>";
+    }
+
+    function boot() {
+      $("setupCard").classList.toggle("hidden", !!SCRIPT_URL);
+
+      if (!SCRIPT_URL) {
+        return;
+      }
+
+      if (session && session.token) {
+        showApp();
+      } else {
+        $("loginScreen").classList.remove("hidden");
+      }
+    }
+
+    window.addEventListener("online", () => {
+      $("onlineStatus").textContent = "Online";
+    });
+
+    window.addEventListener("offline", () => {
+      $("onlineStatus").textContent = "Offline";
+      toast("You are offline", "warn");
+    });
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    boot();
+  </script>
+</body>
+</html>
