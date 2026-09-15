@@ -3,9 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#dc2626">
   <title>NCM Branch Operations</title>
   <style>
-    :root{--red:#dc2626;--blue:#2563eb;--green:#16a34a;--ink:#172033;--muted:#64748b;--line:#e2e8f0;--soft:#f8fafc}
+    :root{--red:#dc2626;--blue:#2563eb;--green:#16a34a;--orange:#f97316;--ink:#172033;--muted:#64748b;--line:#e2e8f0;--soft:#f8fafc}
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--soft);color:var(--ink);min-height:100vh;padding-bottom:76px}
     button,input,select,textarea{font:inherit}
@@ -74,6 +78,18 @@
     .bottom{position:fixed;z-index:10;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px}
     .bottom b{color:var(--red)}
     .build{position:fixed;bottom:4px;right:5px;color:#cbd5e1;font:9px monospace}
+    .confirm-card{border:1.5px solid var(--orange)!important;background:#fff7ed}
+    .confirm-card h3{color:#9a3412}
+    .arrival-btn{padding:22px 14px;font-size:16px}
+    .van-card{border-radius:11px;padding:13px;margin:9px 0;border:2px solid}
+    .van-card.moving{background:#eff6ff;border-color:#93c5fd}
+    .van-card.moving.late{background:#fef2f2;border-color:#fca5a5}
+    .van-card.at-branch{background:#f0fdf4;border-color:#86efac}
+    .van-head{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:15px}
+    .van-route{font-size:13px;color:#334155;margin-top:5px;font-weight:700}
+    .van-timer{font:800 20px monospace;color:var(--blue)}
+    .van-card.moving.late .van-timer{color:var(--red)}
+    .van-card.at-branch .van-timer{color:var(--green)}
     @media(max-width:420px){
       .clock{position:static;text-align:center;margin-top:6px}
       .row{flex-direction:column;align-items:stretch}
@@ -84,7 +100,7 @@
 <body>
   <header class="header">
     <h1>NCM BRANCH OPERATIONS</h1>
-    <p>Announcements · Branch contacts · Driver check-out</p>
+    <p>Announcements · Branch contacts · Van board</p>
     <div class="clock" id="clock">--:--:--<small>--/--/----</small></div>
   </header>
 
@@ -130,6 +146,10 @@
           Contacts
         </button>
 
+        <button class="tab" id="tabVans" onclick="showTab('vans')">
+          Van Board
+        </button>
+
         <button class="tab hidden" id="tabDriver" onclick="showTab('driver')">
           Driver
         </button>
@@ -137,7 +157,7 @@
 
       <section id="dashboardTab">
         <div class="card">
-          <h3>📢 Today’s branch announcements</h3>
+          <h3>📢 Today's branch announcements</h3>
           <p class="muted">
             Announcements stay visible for 24 hours, then disappear automatically.
           </p>
@@ -178,7 +198,7 @@
           <h3>👤 B2B contact directory</h3>
 
           <p class="muted">
-            Each branch can keep today’s responsible B2B person and contact
+            Each branch can keep today's responsible B2B person and contact
             number here. If a name or number is wrong, edit and save it again.
           </p>
 
@@ -219,13 +239,23 @@
         </div>
       </section>
 
+      <section id="vansTab" class="hidden">
+        <div class="card">
+          <h3>🚐 Live Van Board</h3>
+          <p class="muted">Where every van is right now — updates automatically while this tab is open.</p>
+          <div id="vanBoardList">
+            <div class="empty">Loading van board…</div>
+          </div>
+        </div>
+      </section>
+
       <section id="driverTab" class="hidden">
         <div class="card">
           <h3>🚐 Driver check-in / check-out</h3>
-
           <p class="muted">
-            All seven branches use the same rule. At check-out, type the next
-            branch name, for example <b>CHABAHIL</b>.
+            All seven branches use the same rule. Every check-in and check-out
+            needs one extra confirm tap before it's saved, so a mistap never
+            gets written to the sheet.
           </p>
 
           <label>Van number</label>
@@ -238,39 +268,50 @@
           </div>
 
           <p class="muted mt">
-            Use “Change van” if you entered the wrong van number.
+            Use "Change van" if you entered the wrong van number.
           </p>
 
           <div id="driverState" class="driver-status hidden"></div>
         </div>
 
-        <div class="card">
-          <h3 id="driverActionTitle">Select your current branch</h3>
-
-          <p class="muted">
-            Tap the branch where the van is now to check in.
-          </p>
-
-          <div id="checkInBranches" class="branch-grid"></div>
-
-          <div id="checkoutArea" class="hidden">
-            <label>Next branch for check-out</label>
-
-            <input
-              id="nextBranch"
-              list="branchNames"
-              autocomplete="off"
-              placeholder="Type CHABAHIL or choose below"
-            >
-
-            <datalist id="branchNames"></datalist>
-
-            <div id="checkoutBranches" class="branch-grid"></div>
-
-            <button class="btn btn-red btn-full mt" onclick="driverCheckOut()">
-              Check out to this branch
-            </button>
+        <div id="confirmBox" class="card confirm-card hidden">
+          <h3 id="confirmTitle">Confirm</h3>
+          <p id="confirmText" class="muted"></p>
+          <div class="row mt">
+            <button class="btn btn-grey grow" onclick="cancelConfirm()">✗ Cancel</button>
+            <button class="btn btn-green grow" onclick="commitConfirm()">✓ Confirm</button>
           </div>
+        </div>
+
+        <!-- Shown only for the very first check-in of the day, or after an
+             admin reset — the only time a driver genuinely has to choose a
+             branch from a list of more than one valid option. -->
+        <div class="card" id="checkInPickCard">
+          <h3>Select your current branch</h3>
+          <p class="muted">Type or tap where the van is right now.</p>
+          <input id="checkInBranchInput" list="branchNames" autocomplete="off" placeholder="Type TINKUNE or choose below">
+          <div id="checkInBranches" class="branch-grid"></div>
+          <datalist id="branchNames"></datalist>
+          <button class="btn btn-blue btn-full mt" onclick="submitCheckIn()">Check in at this branch</button>
+        </div>
+
+        <!-- Shown while MOVING — there is only one valid destination (the
+             one already chosen at check-out), so there is nothing to pick
+             and therefore nothing to mistap. One button, one meaning. -->
+        <div class="card hidden" id="arrivalCard">
+          <h3 id="arrivalTitle">Arrived?</h3>
+          <p class="muted">Tap once the van has actually arrived — you'll be asked to confirm.</p>
+          <button class="btn btn-green btn-full arrival-btn" onclick="submitArrival()">✓ Confirm Arrival</button>
+        </div>
+
+        <!-- Shown while AT_STATION — checking out is the other place a
+             driver genuinely chooses among several valid branches. -->
+        <div class="card hidden" id="checkoutArea">
+          <h3>Check out</h3>
+          <label>Next branch for check-out</label>
+          <input id="nextBranch" list="branchNames" autocomplete="off" placeholder="Type CHABAHIL or choose below">
+          <div id="checkoutBranches" class="branch-grid"></div>
+          <button class="btn btn-red btn-full mt" onclick="submitCheckOut()">Check out to this branch</button>
         </div>
       </section>
     </section>
@@ -281,7 +322,7 @@
     <span id="onlineStatus">Online</span>
   </footer>
 
-  <div class="build">v21-branch-ops</div>
+  <div class="build">v22-vanboard-confirm</div>
 
   <script>
     const BRANCHES = [
@@ -298,6 +339,9 @@
     let session = JSON.parse(localStorage.getItem("ncm_session") || "null");
     let driverState = null;
     let pollTimer = null;
+    let vanBoardTimer = null;
+    let infoPollTimer = null;
+    let confirmAction = null;
 
     const $ = id => document.getElementById(id);
 
@@ -478,6 +522,10 @@
         $("contactBranch").value = session.branch;
       }
 
+      $("branchNames").innerHTML = BRANCHES.map(branch =>
+        `<option value="${esc(branch)}">`
+      ).join("");
+
       if (isDriver) {
         $("tabDriver").classList.remove("hidden");
         showTab("driver");
@@ -488,22 +536,40 @@
 
       loadAnnouncements();
       loadContacts();
+      startInfoPolling();
+    }
+
+    // Announcements/Contacts change rarely — a gentle background refresh
+    // (not the driver's tight 8s loop) is plenty for 100+ people who just
+    // leave the tab open.
+    function startInfoPolling() {
+      clearInterval(infoPollTimer);
+      infoPollTimer = setInterval(() => {
+        loadAnnouncements();
+        loadContacts();
+      }, 30000);
     }
 
     function showTab(tab) {
-      ["dashboard","contacts","driver"].forEach(name => {
+      ["dashboard","contacts","vans","driver"].forEach(name => {
         $(name + "Tab").classList.toggle("hidden", name !== tab);
       });
 
-      ["Dashboard","Contacts","Driver"].forEach(name => {
-        $("tab" + name).classList.toggle(
-          "active",
-          name.toLowerCase() === tab
-        );
+      ["Dashboard","Contacts","Vans","Driver"].forEach(name => {
+        const el = $("tab" + name);
+        if (el) el.classList.toggle("active", name.toLowerCase() === tab);
       });
 
       if (tab === "driver") {
         initDriver();
+      }
+
+      if (tab === "vans") {
+        loadVanBoard();
+        clearInterval(vanBoardTimer);
+        vanBoardTimer = setInterval(loadVanBoard, 8000);
+      } else {
+        clearInterval(vanBoardTimer);
       }
     }
 
@@ -721,6 +787,64 @@
       }
     }
 
+    /* ───────────────── Van Board (read-only, everyone) ───────────────── */
+
+    async function loadVanBoard() {
+      try {
+        const result = await apiGet({ action: "getVanBoard" });
+        if (!result.success) throw Error(result.error);
+        renderVanBoard(result.data || []);
+      } catch (error) {
+        $("vanBoardList").innerHTML = '<div class="empty">Van board unavailable.</div>';
+      }
+    }
+
+    function renderVanBoard(vans) {
+      const list = $("vanBoardList");
+      if (!vans.length) {
+        list.innerHTML = '<div class="empty">No van activity yet today.</div>';
+        return;
+      }
+      list.innerHTML = vans.map(v => {
+        const moving = v.status === "MOVING";
+        const late = moving && v.elapsedSeconds >= 600;
+        const cls = moving ? "van-card moving" + (late ? " late" : "") : "van-card at-branch";
+        const route = moving
+          ? esc(v.currentBranch) + " → " + esc(v.nextBranch)
+          : "At " + esc(v.currentBranch);
+        return `
+          <div class="${cls}">
+            <div class="van-head">
+              <span>Van ${esc(v.vanNo)}</span>
+              <span class="badge${moving ? (late ? " red" : "") : " green"}">
+                ${moving ? "MOVING" : "AT BRANCH"} · ROUND ${esc(v.round)}
+              </span>
+            </div>
+            <div class="van-route">${route}</div>
+            <div class="van-timer">${formatSeconds(v.elapsedSeconds)}</div>
+          </div>`;
+      }).join("");
+    }
+
+    /* ───────────────── Driver: confirm-before-write helper ───────────────── */
+
+    function askConfirm(title, text, action) {
+      $("confirmTitle").textContent = title;
+      $("confirmText").textContent = text;
+      confirmAction = action;
+      $("confirmBox").classList.remove("hidden");
+      $("confirmBox").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    function cancelConfirm() {
+      confirmAction = null;
+      $("confirmBox").classList.add("hidden");
+    }
+    function commitConfirm() {
+      const action = confirmAction;
+      cancelConfirm();
+      if (action) action();
+    }
+
     function initDriver() {
       if (session.role !== "driver" && session.role !== "admin") {
         return;
@@ -732,22 +856,20 @@
       $("checkInBranches").innerHTML = BRANCHES.map(branch =>
         `
           <button
+            type="button"
             class="branch-choice"
-            onclick="selectCheckIn('${esc(branch)}')"
+            onclick="pickCheckIn('${esc(branch)}', this)"
           >
             ${esc(branch)}
           </button>
         `
       ).join("");
 
-      $("branchNames").innerHTML = BRANCHES.map(branch =>
-        `<option value="${esc(branch)}">`
-      ).join("");
-
+      cancelConfirm();
       loadDriverState();
 
       clearInterval(pollTimer);
-      pollTimer = setInterval(loadDriverState, 10000);
+      pollTimer = setInterval(loadDriverState, 8000);
     }
 
     async function loadDriverState() {
@@ -774,8 +896,7 @@
           renderDriverState(driverState);
         }
       } catch (error) {
-        $("driverActionTitle").textContent =
-          "Offline — enter your branch when connected";
+        $("driverActionTitle") && ($("driverActionTitle").textContent = "Offline — will retry automatically");
       }
     }
 
@@ -788,19 +909,48 @@
 
       localStorage.setItem("ncm_driver_van", van);
       driverState = null;
+      cancelConfirm();
       loadDriverState();
 
       toast("Van number changed");
     }
 
-    function selectCheckIn(branch) {
-      $("driverVan").value = $("driverVan").value.trim();
+    function pickCheckIn(branch, button) {
+      $("checkInBranchInput").value = branch;
+      document
+        .querySelectorAll("#checkInBranches .branch-choice")
+        .forEach(item => item.classList.remove("selected"));
+      if (button) button.classList.add("selected");
+    }
 
-      if (!$("driverVan").value) {
-        return toast("Enter van number first", "bad");
-      }
+    function submitCheckIn() {
+      const van = $("driverVan").value.trim();
+      const branch = normalizeBranch($("checkInBranchInput").value);
 
-      driverCheckIn(branch);
+      if (!van) return toast("Enter van number first", "bad");
+      if (!BRANCHES.includes(branch)) return toast("Type or tap a valid branch name", "bad");
+
+      askConfirm(
+        "Confirm check-in",
+        "Check in van " + van + " at " + branch + "?",
+        () => driverCheckIn(branch)
+      );
+    }
+
+    // The only tap needed once a van is already moving — there is exactly
+    // one valid destination (wherever it was checked out to), so there is
+    // nothing left to pick and nothing left to mistap.
+    function submitArrival() {
+      const van = $("driverVan").value.trim();
+      const branch = driverState && driverState.nextBranch;
+
+      if (!van || !branch) return;
+
+      askConfirm(
+        "Confirm arrival",
+        "Confirm van " + van + " has arrived at " + branch + "?",
+        () => driverCheckIn(branch)
+      );
     }
 
     async function driverCheckIn(branch) {
@@ -843,16 +993,25 @@
       }
     }
 
-    async function driverCheckOut() {
-      const vanNo = $("driverVan").value.trim();
+    function submitCheckOut() {
+      const van = $("driverVan").value.trim();
       const nextBranch = normalizeBranch($("nextBranch").value);
+
+      if (!van) return toast("Enter van number first", "bad");
+      if (!BRANCHES.includes(nextBranch)) return toast("Type or tap a valid branch name", "bad");
+
+      askConfirm(
+        "Confirm check-out",
+        "Check out van " + van + " — heading to " + nextBranch + "?",
+        () => driverCheckOut(nextBranch)
+      );
+    }
+
+    async function driverCheckOut(nextBranch) {
+      const vanNo = $("driverVan").value.trim();
 
       if (!vanNo) {
         return toast("Enter van number first", "bad");
-      }
-
-      if (!BRANCHES.includes(nextBranch)) {
-        return toast("Type a valid branch name", "bad");
       }
 
       try {
@@ -877,37 +1036,36 @@
 
     function renderDriverState(state) {
       const box = $("driverState");
-      const action = $("driverActionTitle");
-      const checkIn = $("checkInBranches");
-      const checkout = $("checkoutArea");
+      const pickCard = $("checkInPickCard");
+      const arrivalCard = $("arrivalCard");
+      const checkoutArea = $("checkoutArea");
 
       if (!state || !state.started) {
         box.classList.add("hidden");
-        action.textContent = "Select your current branch";
-        checkIn.classList.remove("hidden");
-        checkout.classList.add("hidden");
+        pickCard.classList.remove("hidden");
+        arrivalCard.classList.add("hidden");
+        checkoutArea.classList.add("hidden");
         return;
       }
 
       box.classList.remove("hidden");
-      checkIn.classList.add("hidden");
 
       if (state.status === "MOVING") {
         box.className = "driver-status moving";
 
         box.innerHTML = `
           <h3>Heading to ${esc(state.nextBranch)}</h3>
-          <p class="muted">Check in when you arrive.</p>
+          <p class="muted">Confirm arrival once the van gets there.</p>
           <div class="timer">${formatSeconds(state.elapsedSeconds)}</div>
           <span class="badge green">
             MOVING · ROUND ${esc(state.round)}
           </span>
         `;
 
-        action.textContent =
-          "Next check-in: " + state.nextBranch;
-
-        checkout.classList.add("hidden");
+        pickCard.classList.add("hidden");
+        checkoutArea.classList.add("hidden");
+        arrivalCard.classList.remove("hidden");
+        $("arrivalTitle").textContent = "Arrived at " + state.nextBranch + "?";
       } else {
         box.className = "driver-status";
 
@@ -922,10 +1080,9 @@
           </span>
         `;
 
-        action.textContent =
-          "Check out from " + state.branch;
-
-        checkout.classList.remove("hidden");
+        pickCard.classList.add("hidden");
+        arrivalCard.classList.add("hidden");
+        checkoutArea.classList.remove("hidden");
 
         const options = BRANCHES.filter(
           branch => branch !== state.branch
@@ -934,6 +1091,7 @@
         $("checkoutBranches").innerHTML = options.map(branch =>
           `
             <button
+              type="button"
               class="branch-choice"
               onclick="pickNext('${esc(branch)}', this)"
             >
@@ -973,8 +1131,25 @@
       }
     }
 
+    // Phones throttle timers heavily once backgrounded/locked. Force an
+    // immediate refresh the moment the app becomes visible again instead
+    // of waiting for a possibly-stalled interval — this is what keeps it
+    // feeling like a real app rather than a stale browser tab.
+    function resyncEverything() {
+      if (!SCRIPT_URL || !session) return;
+      loadAnnouncements();
+      loadContacts();
+      if (!$("vansTab").classList.contains("hidden")) loadVanBoard();
+      if (session.role === "driver" || session.role === "admin") loadDriverState();
+    }
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) resyncEverything(); });
+    window.addEventListener("pageshow", e => { if (e.persisted) resyncEverything(); });
+    window.addEventListener("focus", resyncEverything);
+
     window.addEventListener("online", () => {
       $("onlineStatus").textContent = "Online";
+      toast("Connection restored", "ok");
+      resyncEverything();
     });
 
     window.addEventListener("offline", () => {
