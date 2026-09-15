@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-//  NCM B2B TRACKER — BACKEND v11 (split portals, fast live board)
+//  NCM B2B TRACKER — BACKEND v12 (driver writes, live-only branch reads)
 //  This version REMOVES the whole Send/Receive shipment
 //  system and the "SHIPMENT GPS" sheet. The app is now:
 //    • Driver check-in / check-out with round detection + controlled edits
@@ -9,7 +9,9 @@
 //    • Issue reporting
 //  Storage is split for speed:
 //    • VAN MOVEMENTS = append/history and edits
-//    • VAN LIVE = one current row per van for live reads
+//    • VAN LIVE = one current row per van for branch/admin live reads
+//  Branch Live Vans reads never open VAN MOVEMENTS. Only driver actions write
+//  VAN MOVEMENTS, then immediately refresh the matching VAN LIVE row.
 //  Old "SHIPMENT GPS" sheet is not used.
 //  Deploy → Manage deployments → Edit → New version → Deploy
 // ═══════════════════════════════════════════════════════
@@ -96,7 +98,7 @@ function timeLabel(seconds) {
 
 /* ═══════════════════════════════════════════════════════
    DRIVER SIDE — free-form check-in/out + round detection
-   ONE sheet only (VAN MOVEMENTS) for speed.
+   Driver writes history in VAN MOVEMENTS and refreshes one VAN LIVE row.
 ═══════════════════════════════════════════════════════ */
 
 const MOVE_COL = {
@@ -372,7 +374,14 @@ function driverStateResponse(state) {
   };
 }
 
+function driverPortalOnly_(data) {
+  // Older clients did not send portal. Keep them compatible, while the
+  // separated frontend explicitly marks all movement writes as driver-only.
+  return !data.portal || String(data.portal).toLowerCase() === "driver";
+}
+
 function handleDriverCheckIn(data) {
+  if (!driverPortalOnly_(data)) return { success:false, error:"Only the driver portal can update van movements" };
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
@@ -441,6 +450,7 @@ function handleDriverCheckIn(data) {
 }
 
 function handleDriverCheckOut(data) {
+  if (!driverPortalOnly_(data)) return { success:false, error:"Only the driver portal can update van movements" };
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
@@ -491,6 +501,7 @@ function parseEditDate_(value) {
 }
 
 function handleEditDriverMovement(data) {
+  if (!driverPortalOnly_(data)) return { success:false, error:"Only the driver portal can edit van movements" };
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
@@ -568,7 +579,9 @@ function handleEditDriverMovement(data) {
 }
 
 function getVanBoard() {
-  ensureLiveSheetToday_();
+  // Read-only live board. This intentionally never calls
+  // ensureLiveSheetToday_ or reads VAN MOVEMENTS. Legacy migration belongs to
+  // driver state/bootstrap, not to the branch portal's hot path.
   var dateStr = today();
   var cacheKey = 'van_board_raw_' + dateStr;
   var rows = null;
@@ -622,7 +635,7 @@ function getVanBoard() {
 }
 
 function getLiveVans(vanList) {
-  ensureLiveSheetToday_();
+  // Targeted read-only path for the branch/admin portal.
   var requested = String(vanList || "").split(",").map(function(v) {
     return v.trim();
   }).filter(Boolean).slice(0, 5);
@@ -823,6 +836,9 @@ function doGet(e) {
     return jsonResponse({ success:true, destinations: DESTINATIONS[requestedBranch] || [], mainBranches: MAIN_BRANCHES });
   }
   if (action === "getVanBoard") {
+    return jsonResponse({ success:true, data:getVanBoard(), date:today() });
+  }
+  if (action === "getLiveVanBoard") {
     return jsonResponse({ success:true, data:getVanBoard(), date:today() });
   }
   if (action === "getLiveVans") {
