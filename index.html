@@ -269,7 +269,7 @@ input:focus,select:focus{outline:none;border-color:#dc2626}
 <div class="build-tag" id="buildTag"></div>
 
 <script>
-const APP_VERSION = "v24-fast-live";
+const APP_VERSION = "v25-driver-stable";
 let SCRIPT_URL = localStorage.getItem('ncm_url') || "";
 let currentBranch = "";
 let currentRole = "";
@@ -284,6 +284,7 @@ const DRIVER_POLL_MS = 5000;
 const VAN_BOARD_POLL_MS = 15000;
 const VAN_BOARD_SNAPSHOT_MS = 60000;
 const OUTBOX_FLUSH_MS = 10000;
+const MIN_TRAVEL_SECONDS = 120;
 
 // Driver state
 let driverVanNo = localStorage.getItem('ncm_driver_van') || "";
@@ -443,7 +444,9 @@ function init() {
   document.getElementById('buildTag').textContent = APP_VERSION;
   const savedVersion = localStorage.getItem('ncm_version');
   if (savedVersion !== APP_VERSION) {
-    localStorage.removeItem('ncm_session');
+    // Keep active users logged in across frontend fixes. Only discard the
+    // state snapshot; the server remains the source of truth.
+    localStorage.removeItem(DRIVER_STATE_CACHE_KEY);
     localStorage.setItem('ncm_version', APP_VERSION);
   }
   if (!SCRIPT_URL) {
@@ -486,7 +489,10 @@ async function apiGet(params) {
   const timeout = setTimeout(() => controller.abort(), 12000);
   let res;
   try {
-    res = await fetch(SCRIPT_URL + "?" + new URLSearchParams(params), { signal: controller.signal });
+    res = await fetch(SCRIPT_URL + "?" + new URLSearchParams(params), {
+      signal: controller.signal,
+      cache: 'no-store'
+    });
   } finally {
     clearTimeout(timeout);
   }
