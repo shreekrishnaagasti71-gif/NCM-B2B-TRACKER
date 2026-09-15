@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-//  NCM B2B TRACKER — BACKEND v7 (smart polling)
+//  NCM B2B TRACKER — BACKEND v8 (smart polling + admin panels)
 //  New in this version:
 //   • Round detection for drivers: a round closes whenever the van
 //     checks back into TINKUNE. The branches visited since the last
@@ -694,6 +694,113 @@ function closeIssue(row) {
 }
 
 /* ═══════════════════════════════════════════════════════
+   ANNOUNCEMENTS & BRANCH CONTACTS — admin/branch panels
+   Both are CACHED like the van board (one read serves everyone)
+   and every write invalidates the cache instantly.
+═══════════════════════════════════════════════════════ */
+
+const INFO_TTL = 60; // seconds
+
+function getAnnouncementSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("ANNOUNCEMENTS");
+  if (!sheet) {
+    sheet = ss.insertSheet("ANNOUNCEMENTS");
+    sheet.appendRow(["Date","Branch","Message","Time"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getBranchContactSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("BRANCH CONTACTS");
+  if (!sheet) {
+    sheet = ss.insertSheet("BRANCH CONTACTS");
+    sheet.appendRow(["Branch","Contact Person","Phone","Updated"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// One announcement per branch per day — posting again EDITS it.
+function handlePutAnnouncement(data) {
+  var branch = String(data.branch || "").toUpperCase().trim();
+  var message = String(data.message || "").trim();
+  if (!branch || !DESTINATIONS[branch]) return { success:false, error:"Invalid branch" };
+  if (!message) return { success:false, error:"Write the announcement first" };
+  if (message.length > 300) return { success:false, error:"Keep it under 300 characters" };
+  var sheet = getAnnouncementSheet();
+  var values = sheet.getDataRange().getValues();
+  var dateStr = today();
+  var timeStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "HH:mm");
+  for (var i = 1; i < values.length; i++) {
+    if (normalizeDateStr(values[i][0]) === dateStr &&
+        String(values[i][1]).toUpperCase().trim() === branch) {
+      sheet.getRange(i + 1, 3, 1, 2).setValues([[message, timeStr]]);
+      removeCached_('announcements_' + dateStr);
+      return { success:true, message:"Announcement updated for " + branch };
+    }
+  }
+  sheet.appendRow([dateStr, branch, message, timeStr]);
+  removeCached_('announcements_' + dateStr);
+  return { success:true, message:"Announcement posted for " + branch };
+}
+
+function getAnnouncements() {
+  var dateStr = today();
+  var key = 'announcements_' + dateStr;
+  var cached = getCached_(key);
+  if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  var values = getAnnouncementSheet().getDataRange().getValues();
+  var result = [];
+  for (var i = 1; i < values.length; i++) {
+    if (normalizeDateStr(values[i][0]) === dateStr) {
+      result.push({ branch: values[i][1], message: values[i][2], time: values[i][3] });
+    }
+  }
+  setCached_(key, JSON.stringify(result), INFO_TTL);
+  return result;
+}
+
+// One contact row per branch — saving again EDITS it.
+function handleSaveBranchContact(data) {
+  var branch = String(data.branch || "").toUpperCase().trim();
+  var name = String(data.name || "").trim();
+  var phone = String(data.phone || "").trim();
+  if (!branch || !DESTINATIONS[branch]) return { success:false, error:"Invalid branch" };
+  if (!name) return { success:false, error:"Enter the contact person's name" };
+  if (!phone) return { success:false, error:"Enter a phone number" };
+  if (phone.length > 20) return { success:false, error:"Phone number looks too long" };
+  var sheet = getBranchContactSheet();
+  var values = sheet.getDataRange().getValues();
+  var nowStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM-dd HH:mm");
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]).toUpperCase().trim() === branch) {
+      sheet.getRange(i + 1, 2, 1, 3).setValues([[name, phone, nowStr]]);
+      removeCached_('branch_contacts');
+      return { success:true, message:"Contact updated for " + branch };
+    }
+  }
+  sheet.appendRow([branch, name, phone, nowStr]);
+  removeCached_('branch_contacts');
+  return { success:true, message:"Contact saved for " + branch };
+}
+
+function getBranchContacts() {
+  var key = 'branch_contacts';
+  var cached = getCached_(key);
+  if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  var values = getBranchContactSheet().getDataRange().getValues();
+  var result = [];
+  for (var i = 1; i < values.length; i++) {
+    result.push({ branch: values[i][0], name: values[i][1], phone: values[i][2], updated: values[i][3] });
+  }
+  setCached_(key, JSON.stringify(result), INFO_TTL);
+  return result;
+}
+
+/* ═══════════════════════════════════════════════════════
    WEB APP ENTRY POINTS
 ═══════════════════════════════════════════════════════ */
 
@@ -732,6 +839,12 @@ function doGet(e) {
   if (action === "getIssues") {
     return jsonResponse({ success:true, data:getIssues(false) });
   }
+  if (action === "getAnnouncements") {
+    return jsonResponse({ success:true, data:getAnnouncements(), date:today() });
+  }
+  if (action === "getBranchContacts") {
+    return jsonResponse({ success:true, data:getBranchContacts() });
+  }
 
   return jsonResponse({ success: false, error: "Unknown action" });
 }
@@ -749,6 +862,8 @@ function doPost(e) {
     case 'driverCheckIn':   return jsonResponse(handleDriverCheckIn(body));
     case 'driverCheckOut':  return jsonResponse(handleDriverCheckOut(body));
     case 'submitIssue':     return jsonResponse(submitIssue(body));
+    case 'putAnnouncement':   return jsonResponse(handlePutAnnouncement(body));
+    case 'saveBranchContact': return jsonResponse(handleSaveBranchContact(body));
     case 'closeIssue':      return jsonResponse(closeIssue(body.row));
     default:                return jsonResponse({ success: false, error: 'Unknown action' });
   }
