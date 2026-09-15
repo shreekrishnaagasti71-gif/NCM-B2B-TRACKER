@@ -35,46 +35,19 @@ body{font-family:Segoe UI,Arial,sans-serif;background:#f8fafc;color:#1e293b;min-
 label{display:block;color:#64748b;font-size:12px;margin-bottom:5px;font-weight:600}
 input,select{width:100%;padding:11px;font-size:15px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;color:#1e293b}
 input:focus,select:focus{outline:none;border-color:#dc2626}
-input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;border-color:#e2e8f0}
-.scan-big{width:100%;padding:28px;font-size:18px;font-weight:800;border:none;border-radius:14px;cursor:pointer;background:#16a34a;color:#fff;text-transform:uppercase;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(22,163,74,0.25);display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px}
-.scan-big:hover{background:#15803d}
-.scan-big:active{transform:scale(0.98)}
-.chip-box{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;min-height:56px;margin-top:10px;position:relative}
-.chip-box:focus-within{border-color:#dc2626}
-.chip-list{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.chip{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:20px;padding:6px 10px 6px 14px;display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#1e293b;animation:popIn 0.15s ease}
-.chip .x{background:#cbd5e1;border:none;border-radius:50%;width:18px;height:18px;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;font-weight:700}
-.chip .x:hover{background:#dc2626}
-.chip-placeholder{color:#94a3b8;font-size:13px;font-style:italic}
-@keyframes popIn{from{transform:scale(0.8);opacity:0}to{transform:scale(1);opacity:1}}
 .branch-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .branch-card{background:#fff;border:2px solid #e2e8f0;border-radius:10px;padding:14px 6px;text-align:center;cursor:pointer;transition:all 0.15s;font-size:13px;font-weight:700;color:#475569;touch-action:manipulation;pointer-events:auto;user-select:none}
 .branch-card:active{transform:scale(0.96)}
 .branch-card.selected{background:#2563eb;border-color:#2563eb;color:#fff;box-shadow:0 2px 8px rgba(37,99,235,0.25)}
-.branch-display{background:#f0f9ff;border:2px solid #2563eb;border-radius:10px;padding:14px;text-align:center;font-size:16px;font-weight:800;color:#2563eb;margin-bottom:12px}
 .van-card{border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all 0.15s;border:2px solid}
 .van-card.green{background:#dcfce7;border-color:#16a34a;color:#14532d}
 .van-card.red{background:#fee2e2;border-color:#dc2626;color:#7f1d1d}
 .van-card.blue{background:#eff6ff;border-color:#93c5fd;color:#1e3a8a;cursor:default}
-.van-card:active{transform:scale(0.98)}
 .van-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .van-title{font-size:16px;font-weight:800}
 .van-timer{font-size:24px;font-weight:800;font-family:monospace;letter-spacing:1px}
 .van-meta{font-size:12px;font-weight:600;opacity:0.8;margin-top:4px}
 .round-badge{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;background:#fef9c3;color:#854d0e;margin-left:4px}
-.cam-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:2000;flex-direction:column}
-.cam-modal.active{display:flex}
-.cam-modal video{width:100%;height:calc(100% - 80px);object-fit:cover}
-.cam-bar{height:80px;background:#111;display:flex;align-items:center;justify-content:center;gap:20px;padding:0 20px}
-.cam-bar button{padding:12px 24px;font-size:14px;font-weight:700;border:none;border-radius:10px;cursor:pointer}
-.cam-done{background:#dc2626;color:#fff}
-.pending-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.pending-count{font-size:28px;font-weight:800;color:#2563eb}
-.shipment-list{background:#fff;border-radius:10px;border:1px solid #e2e8f0;max-height:220px;overflow-y:auto}
-.shipment-item{padding:10px 14px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center}
-.shipment-item:last-child{border-bottom:none}
-.shipment-id{font-weight:700;color:#1e293b;font-size:14px}
-.shipment-meta{font-size:11px;color:#64748b;margin-top:1px}
 .toast{position:fixed;top:15px;left:50%;transform:translateX(-50%);padding:14px 22px;border-radius:10px;font-weight:700;z-index:3000;display:none;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:90%;text-align:center}
 .toast.ok{background:#16a34a;color:#fff}.toast.bad{background:#dc2626;color:#fff}.toast.warn{background:#ca8a04;color:#fff}
 .status-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;padding:10px 16px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:12px;z-index:100}
@@ -82,18 +55,17 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
 .driver-badge{background:#2563eb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;text-transform:uppercase;margin-left:6px}
 .reset-btn{position:fixed;top:10px;right:10px;z-index:500;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer}
 .hidden{display:none!important}
-.mt-10{margin-top:10px}.mt-15{margin-top:15px}.flex{display:flex;gap:8px}.flex-1{flex:1}
+.mt-10{margin-top:10px}.mt-15{margin-top:15px}
 .route-state{border-radius:12px;padding:16px;background:#eff6ff;border:1.5px solid #93c5fd;margin-top:12px;transition:background 0.25s ease,border-color 0.25s ease,opacity 0.2s ease}
 .route-state.moving{background:#f0fdf4;border-color:#86efac}
 .route-state.fade-in{animation:fadeSlide 0.25s ease}
 @keyframes fadeSlide{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 .branch-card{transition:all 0.15s ease}
 .branch-card.picked{background:#16a34a;border-color:#16a34a;color:#fff;transform:scale(0.96)}
-.big-time{transition:color 0.2s ease}
 .route-state h3{font-size:18px;color:#1e293b;margin-bottom:5px}
 .route-state p{font-size:12px;color:#475569;margin-top:4px}
 .timer-label{font-size:11px;font-weight:800;letter-spacing:.08em;color:#64748b;margin-top:12px}
-.big-time{font:800 28px monospace;color:#2563eb;margin:10px 0}
+.big-time{font:800 28px monospace;color:#2563eb;margin:10px 0;transition:color 0.2s ease}
 .big-time.on-time{color:#16a34a}.big-time.late{color:#dc2626}
 .route-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .route-actions .btn{font-size:12px;padding:12px 6px}
@@ -104,6 +76,7 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
 .issue-box textarea{width:100%;min-height:65px;resize:vertical;padding:11px;font:14px inherit;border:1.5px solid #e2e8f0;border-radius:8px}
 </style>
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 
@@ -111,7 +84,7 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
 
 <div class="header">
   <h1>NCM B2B TRACKER</h1>
-  <p id="headerSub">Scan · Send · Receive · Live</p>
+  <p id="headerSub">Announcements · Contacts · Live Vans</p>
   <div class="live-clock" id="liveClock">--:--:--<small>--/--/----</small></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -138,88 +111,26 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
 
     <div class="nav-tabs">
       <div class="nav-tab active" id="mainNavTab" onclick="showTab('main')">-</div>
-      <div class="nav-tab" id="secondNavTab" onclick="showTab('second')">Receive</div>
+      <div class="nav-tab" id="secondNavTab" onclick="showTab('second')">Contacts</div>
       <div class="nav-tab" id="allVansNavTab" onclick="showTab('vans')">All Vans</div>
     </div>
 
-    <div id="receiveTab" class="hidden">
-        <div class="card">
-          <h4>Receive Shipments</h4>
-          <div id="staffBranchBox">
-            <label>Receiving For Branch</label>
-            <div class="branch-display" id="staffBranchDisplay">-</div>
-          </div>
-          <div id="incomingVansSection" class="hidden mt-10">
-            <h4 style="font-size:13px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">🚐 Incoming Vans</h4>
-            <div id="incomingVansList"></div>
-          </div>
-          <label>Van Number</label>
-          <div class="flex">
-            <input type="text" id="recvVanNo" placeholder="e.g. 843" class="flex-1">
-            <button class="btn btn-blue btn-small" onclick="fetchPending()">Load List</button>
-          </div>
-          <button class="scan-big" onclick="openCamera('receive')">📷 Scan Barcodes</button>
-          <div style="margin-top:12px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <label style="margin:0">Scanned IDs <span style="font-weight:400;color:#94a3b8">— auto-sends after you pause</span></label>
-              <span style="font-size:12px;color:#64748b;font-weight:700" id="scanCount">0 items</span>
-            </div>
-            <div class="chip-box" style="min-height:70px" onclick="document.getElementById('recvInput').focus()">
-              <div class="chip-list" id="recvChipList">
-                <span class="chip-placeholder">Scanned shipment IDs appear here</span>
-              </div>
-              <textarea id="recvInput" style="position:absolute;opacity:0;height:0;width:0;left:0;top:0" oninput="handleRecvInput(this)" onkeydown="recvKey(event)" onpaste="recvPaste(event)"></textarea>
-            </div>
-          </div>
-          <button class="btn btn-grey mt-10" onclick="fetchPending()" style="padding:10px;font-size:12px">↻ Fetch Pending List from Sheet</button>
-        </div>
-        <button class="btn btn-green mt-10" id="recvBatchBtn" onclick="submitBatch()" disabled>RECEIVE ALL SCANNED (<span id="recvBtnCount">0</span>)</button>
-        <div id="pendingSection" class="hidden mt-15">
-          <div class="card">
-            <div class="pending-header">
-              <h4 style="margin:0">Pending in Sheet</h4>
-              <div class="pending-count" id="pendingCount">0</div>
-            </div>
-            <div class="shipment-list" id="shipmentList"></div>
-            <button class="btn btn-blue mt-10" onclick="receiveAllSheet()" style="font-size:13px">Receive All from Sheet</button>
-          </div>
-        </div>
-    </div>
-
-    <div id="branchViewRoot" class="hidden">
-      <div id="sendTab">
-        <div class="card">
-          <h4>Send Shipment</h4>
-          <label>Origin Branch</label>
-          <input type="text" id="originBranchDisplay" readonly>
-          <label>Destination Branch</label>
-          <select id="destBranch"></select>
-           <label>Driver-checked-in Van</label>
-           <select id="sendVanNo" disabled>
-             <option value="">Loading checked-in vans…</option>
-           </select>
-           <div id="sendVanStatus" style="font-size:11px;color:#64748b;margin-top:5px">Only vans checked in by their driver at this branch can be selected.</div>
-          <label>Shipment IDs <span style="font-weight:400;color:#94a3b8">— scan as fast as you want</span></label>
-          <div class="chip-box" onclick="document.getElementById('sendInput').focus()">
-            <div class="chip-list" id="sendChipList">
-              <span class="chip-placeholder">Scan or paste shipment IDs here</span>
-            </div>
-            <textarea id="sendInput" style="position:absolute;opacity:0;height:0;width:0;left:0;top:0" oninput="handleSendInput(this)" onkeydown="sendKey(event)" onpaste="sendPaste(event)"></textarea>
-          </div>
-          <button class="scan-big" onclick="openCamera('send')">📷 Scan Barcodes</button>
-          <button class="btn btn-red mt-10" onclick="sendShipments()">SEND ALL (<span id="sendCount">0</span>)</button>
-        </div>
-
+    <!-- ============ MAIN TAB: ANNOUNCEMENTS (branch) / CHECK IN-OUT (driver) / ADMIN ============ -->
+    <div id="mainTab" class="hidden">
+      <div id="branchViewRoot" class="hidden">
         <div class="card">
           <h4>📢 Announcements — Today</h4>
           <div id="announceList" style="font-size:13px;color:#64748b">Loading…</div>
-          <label class="mt-10">Post / edit today's announcement for <b id="annBranchLabel" style="color:#dc2626">-</b></label>
-          <textarea id="announceInput" style="width:100%;min-height:60px;margin-top:5px;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font:14px inherit" placeholder="Write today's announcement for your branch…"></textarea>
+        </div>
+        <div class="card">
+          <h4>Post / Edit My Announcement</h4>
+          <label>Your branch</label>
+          <div class="branch-display" style="background:#f0f9ff;border:2px solid #2563eb;border-radius:10px;padding:12px;text-align:center;font-size:15px;font-weight:800;color:#2563eb;margin-bottom:12px" id="annBranchLabel">-</div>
+          <textarea id="announceInput" style="width:100%;min-height:60px;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font:14px inherit" placeholder="Write today's announcement for your branch…"></textarea>
           <button class="btn btn-blue mt-10" onclick="postAnnouncement()">POST / UPDATE ANNOUNCEMENT</button>
         </div>
-
         <div class="card">
-          <h4>📇 Branch Contact Person</h4>
+          <h4>📇 My Branch Contact Person</h4>
           <div id="ownContactView" style="font-size:13px;color:#64748b">Loading…</div>
           <label class="mt-10">Contact Person Name</label>
           <input type="text" id="contactNameInput" placeholder="e.g. Babu Ram Upadhyaya">
@@ -228,86 +139,88 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
           <button class="btn btn-blue mt-10" onclick="saveContact()">SAVE CONTACT (EDIT ANY TIME)</button>
         </div>
       </div>
+
+      <!-- ============ DRIVER VIEW ============ -->
+      <div id="driverViewRoot" class="hidden">
+        <div class="card" id="vanNoCard">
+          <h4>🚐 Enter Your Van Number</h4>
+          <p style="font-size:12px;color:#64748b;margin-bottom:10px">This locks once set — you won't need to re-enter it until you log out.</p>
+          <input type="text" id="driverVanNoInput" placeholder="e.g. 843">
+          <button class="btn btn-blue mt-10" onclick="confirmVanNo()">Confirm Van Number</button>
+        </div>
+
+        <div class="card hidden" id="driverCard">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+            <h4 style="flex:1;margin:0">📍 Check In / Check Out <span class="round-badge" id="roundBadge">Round 1</span></h4>
+            <button class="btn btn-grey btn-small" onclick="editVanNo()">✏️ Edit</button>
+          </div>
+          <p style="font-size:12px;color:#64748b;margin-bottom:6px">Van <b id="driverVanLabel">-</b></p>
+
+          <div id="branchPickBox">
+            <p id="branchPickPrompt" style="font-size:12px;color:#475569;margin-bottom:8px;font-weight:700">Select the branch you're at:</p>
+            <div class="branch-grid" id="branchPickGrid"></div>
+          </div>
+
+          <div id="driverStateBox" class="route-state hidden">
+            <h3 id="driverStateTitle">-</h3>
+            <p id="driverStateText">-</p>
+            <div class="timer-label" id="driverTimerLabel" style="display:none">HOLD TIME</div>
+            <div class="big-time" id="driverTimer" style="display:none">00:00</div>
+            <div class="route-actions">
+              <button class="btn btn-green" id="driverCheckInBtn" onclick="driverCheckIn()" disabled>CHECK IN</button>
+              <button class="btn btn-outline-red" id="driverCheckOutBtn" onclick="driverCheckOutStart()" disabled>CHECK OUT</button>
+            </div>
+            <div id="driverServerStatus" class="route-server-status" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="card issue-box">
+          <h4>📝 Report an Issue</h4>
+          <textarea id="driverIssueInput" placeholder="Example: Van delayed, road blocked, etc."></textarea>
+          <button class="btn btn-grey mt-10" onclick="submitDriverIssue()">Send Issue to Admin</button>
+        </div>
+      </div>
+
+      <!-- ============ ADMIN VIEW ============ -->
+      <div id="adminViewRoot" class="hidden">
+        <div class="card">
+          <h4>📢 Branch Announcements — Today</h4>
+          <div id="adminAnnounceList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
+          <label class="mt-10">Post / update as branch</label>
+          <select id="adminAnnBranch"></select>
+          <textarea id="adminAnnInput" style="width:100%;min-height:60px;margin-top:8px;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font:14px inherit" placeholder="Write today's announcement…"></textarea>
+          <button class="btn btn-blue mt-10" onclick="postAdminAnnouncement()">POST / UPDATE ANNOUNCEMENT</button>
+        </div>
+
+        <div class="card">
+          <h4>📇 Branch Contact Details</h4>
+          <div id="adminContactList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
+          <label class="mt-10">Branch</label>
+          <select id="adminContactBranch"></select>
+          <label class="mt-10">Contact Person</label>
+          <input type="text" id="adminContactName" placeholder="Name">
+          <label class="mt-10">Phone</label>
+          <input type="text" id="adminContactPhone" placeholder="Phone">
+          <button class="btn btn-blue mt-10" onclick="saveAdminContact()">SAVE / UPDATE CONTACT</button>
+        </div>
+
+        <div class="card">
+          <h4>🚐 All Vans — Live Board (1-min auto refresh)</h4>
+          <div id="adminVanBoardList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
+        </div>
+      </div>
     </div>
 
-    <!-- ============ DRIVER VIEW (free check-in/check-out + rounds) ============ -->
-    <div id="driverViewRoot" class="hidden">
-
-      <div class="card" id="vanNoCard">
-        <h4>🚐 Enter Your Van Number</h4>
-        <p style="font-size:12px;color:#64748b;margin-bottom:10px">This locks once set — you won't need to re-enter it until you log out.</p>
-        <input type="text" id="driverVanNoInput" placeholder="e.g. 843">
-        <button class="btn btn-blue mt-10" onclick="confirmVanNo()">Confirm Van Number</button>
-      </div>
-
-      <div class="card hidden" id="driverCard">
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-          <h4 style="flex:1;margin:0">📍 Check In / Check Out <span class="round-badge" id="roundBadge">Round 1</span></h4>
-          <button class="btn btn-grey btn-small" onclick="editVanNo()">✏️ Edit</button>
-        </div>
-        <p style="font-size:12px;color:#64748b;margin-bottom:6px">Van <b id="driverVanLabel">-</b></p>
-
-        <div id="branchPickBox">
-          <p id="branchPickPrompt" style="font-size:12px;color:#475569;margin-bottom:8px;font-weight:700">Select the branch you're at:</p>
-          <div class="branch-grid" id="branchPickGrid"></div>
-        </div>
-
-        <div id="driverStateBox" class="route-state hidden">
-          <h3 id="driverStateTitle">-</h3>
-          <p id="driverStateText">-</p>
-          <div class="timer-label" id="driverTimerLabel" style="display:none">HOLD TIME</div>
-          <div class="big-time" id="driverTimer" style="display:none">00:00</div>
-          <div class="route-actions">
-            <button class="btn btn-green" id="driverCheckInBtn" onclick="driverCheckIn()" disabled>CHECK IN</button>
-            <button class="btn btn-outline-red" id="driverCheckOutBtn" onclick="driverCheckOutStart()" disabled>CHECK OUT</button>
-          </div>
-          <div id="driverServerStatus" class="route-server-status" aria-live="polite"></div>
-        </div>
-      </div>
-
+    <!-- ============ SECOND TAB: CONTACT PERSONS (all branches) ============ -->
+    <div id="contactsTab" class="hidden">
       <div class="card">
         <h4>📇 Branch Contact Persons</h4>
-        <p style="font-size:11px;color:#94a3b8;margin-bottom:6px">Tap a number to call.</p>
-        <div id="driverContactList" style="font-size:13px">Loading…</div>
-      </div>
-
-      <div class="card issue-box">
-        <h4>📝 Report an Issue</h4>
-        <textarea id="driverIssueInput" placeholder="Example: Van delayed, road blocked, etc."></textarea>
-        <button class="btn btn-grey mt-10" onclick="submitDriverIssue()">Send Issue to Admin</button>
+        <p style="font-size:11px;color:#94a3b8;margin-bottom:6px">Tap a phone number to call.</p>
+        <div id="contactList" style="font-size:13px">Loading…</div>
       </div>
     </div>
 
-    <!-- ============ ADMIN VIEW — announcements + contacts + all vans ============ -->
-    <div id="adminViewRoot" class="hidden">
-      <div class="card">
-        <h4>📢 Branch Announcements — Today</h4>
-        <div id="adminAnnounceList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
-        <label class="mt-10">Post / update as branch</label>
-        <select id="adminAnnBranch"></select>
-        <textarea id="adminAnnInput" style="width:100%;min-height:60px;margin-top:8px;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font:14px inherit" placeholder="Write today's announcement…"></textarea>
-        <button class="btn btn-blue mt-10" onclick="postAdminAnnouncement()">POST / UPDATE ANNOUNCEMENT</button>
-      </div>
-
-      <div class="card">
-        <h4>📇 Branch Contact Details</h4>
-        <div id="adminContactList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
-        <label class="mt-10">Branch</label>
-        <select id="adminContactBranch"></select>
-        <label class="mt-10">Contact Person</label>
-        <input type="text" id="adminContactName" placeholder="Name">
-        <label class="mt-10">Phone</label>
-        <input type="text" id="adminContactPhone" placeholder="Phone">
-        <button class="btn btn-blue mt-10" onclick="saveAdminContact()">SAVE / UPDATE CONTACT</button>
-      </div>
-
-      <div class="card">
-        <h4>🚐 All Vans — Live Board (1-min auto refresh)</h4>
-        <div id="adminVanBoardList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
-      </div>
-    </div>
-
-    <!-- ============ ALL VANS — company-wide monitor (last tab) ============ -->
+    <!-- ============ THIRD TAB: ALL VANS ============ -->
     <div id="vansTab" class="hidden">
       <div class="card">
         <h4>🚐 All Vans — Live Company Board</h4>
@@ -324,38 +237,16 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
 </div>
 <div class="build-tag" id="buildTag"></div>
 
-<div class="cam-modal" id="camModal">
-  <video id="camVideo" autoplay playsinline muted></video>
-  <canvas id="camCanvas" style="display:none"></canvas>
-  <div class="cam-bar">
-    <button class="cam-done" onclick="closeCamera()">✕ Done Scanning</button>
-  </div>
-</div>
-
 <script>
-const APP_VERSION = "v22-admin-panels";
-const MIN_TRAVEL_SECONDS = 120;
+const APP_VERSION = "v23-no-shipments";
 let SCRIPT_URL = localStorage.getItem('ncm_url') || "";
 let currentBranch = "";
 let currentRole = "";
 let currentDestinations = [];
-let scanMode = "";
-let sendQueue = [];
-let recvQueue = [];
-let barcodeDetector = null;
-let camStream = null;
-let isScanning = false;
-let recvTimer = null;
-let vanTimerInterval = null;
-let vanPollInterval = null;
 let vanBoardPollInterval = null;
-const RECV_AUTO_DELAY = 600;
-// SMART POLLING: slower intervals + pause when tab is in background.
-// The server caches reads, so fast polling no longer helps anyone.
-const DRIVER_POLL_MS = 15000;    // driver status: 15s (was 5s)
-const VAN_BOARD_POLL_MS = 60000; // company board: 1 min, as requested
-const VAN_POLL_MS = 30000;       // incoming vans: 30s (was 10s)
-const OUTBOX_FLUSH_MS = 10000;   // offline outbox: 10s (was 5s)
+const DRIVER_POLL_MS = 15000;
+const VAN_BOARD_POLL_MS = 60000;
+const OUTBOX_FLUSH_MS = 10000;
 
 // Driver state
 let driverVanNo = localStorage.getItem('ncm_driver_van') || "";
@@ -369,7 +260,6 @@ const DRIVER_BRANCH_DESTINATIONS = {
   SWOYAMBHU: ["KALANKI","NAYA BUSPARK","BASUNDHARA","CHABAHIL","TINKUNE","SATDOBATO","NEWROAD"]
 };
 let pickingNextBranch = false;
-let checkoutOptions = [];
 let checkoutInFlight = false;
 const DRIVER_OUTBOX_KEY = 'ncm_driver_outbox_v1';
 const DRIVER_STATE_CACHE_KEY = 'ncm_driver_state_cache_v1';
@@ -382,18 +272,15 @@ function loadDriverOutbox() {
     return Array.isArray(parsed) ? parsed : [];
   } catch(e) { return []; }
 }
-
 function saveDriverOutbox() {
   localStorage.setItem(DRIVER_OUTBOX_KEY, JSON.stringify(driverOutbox));
 }
-
 function cacheDriverState() {
   if (!driverState || !driverVanNo) return;
   localStorage.setItem(DRIVER_STATE_CACHE_KEY, JSON.stringify({
     vanNo: driverVanNo, state: driverState, savedAt: Date.now()
   }));
 }
-
 function restoreDriverStateCache() {
   try {
     const cached = JSON.parse(localStorage.getItem(DRIVER_STATE_CACHE_KEY) || 'null');
@@ -402,11 +289,9 @@ function restoreDriverStateCache() {
     }
   } catch(e) {}
 }
-
 function pendingDriverOperations() {
   return driverOutbox.filter(op => String(op.vanNo) === String(driverVanNo));
 }
-
 function optimisticStateForOperation(state, op) {
   const data = op.data || {};
   if (op.action === 'driverCheckIn') {
@@ -428,7 +313,6 @@ function optimisticStateForOperation(state, op) {
   }
   return state;
 }
-
 function applyPendingDriverState() {
   const pending = pendingDriverOperations();
   if (!pending.length) return;
@@ -437,7 +321,6 @@ function applyPendingDriverState() {
   driverState = state;
   cacheDriverState();
 }
-
 function queueDriverOperation(action, data) {
   const duplicate = driverOutbox.some(op =>
     op.action === action &&
@@ -454,12 +337,10 @@ function queueDriverOperation(action, data) {
     saveDriverOutbox();
   }
 }
-
 function removeDriverOperation(id) {
   driverOutbox = driverOutbox.filter(op => op.id !== id);
   saveDriverOutbox();
 }
-
 function setDriverPendingStatus() {
   if (pendingDriverOperations().length) {
     setDriverServerStatus(
@@ -470,7 +351,6 @@ function setDriverPendingStatus() {
     );
   }
 }
-
 async function flushDriverOutbox() {
   if (driverSyncInFlight || !SCRIPT_URL || !driverOutbox.length) return;
   if (navigator.onLine === false) {
@@ -486,8 +366,6 @@ async function flushDriverOutbox() {
         saveDriverOutbox();
         const res = await apiPost(Object.assign({}, op.data, { clientId: op.id }));
         if (!res || !res.success) {
-          // This is a real server rejection, not a connection failure.
-          // Remove it so a bad action cannot block all later actions.
           removeDriverOperation(op.id);
           await loadDriverState();
           setDriverServerStatus('Apps Script: ' + ((res && res.error) || 'action rejected'), 'bad');
@@ -629,10 +507,9 @@ function showApp() {
     document.getElementById('roleBadge').innerText = 'DRIVER';
     document.getElementById('headerSub').textContent = 'Check In · Check Out · Live';
     document.getElementById('branchViewRoot').classList.add('hidden');
+    document.getElementById('adminViewRoot').classList.add('hidden');
     document.getElementById('driverViewRoot').classList.remove('hidden');
     document.getElementById('mainNavTab').textContent = 'Check In/Out';
-    document.getElementById('secondNavTab').classList.remove('hidden');
-    document.getElementById('secondNavTab').textContent = 'Receive';
     showTab('main');
     initDriverView();
   } else if (currentRole === 'admin') {
@@ -644,7 +521,6 @@ function showApp() {
     document.getElementById('driverViewRoot').classList.add('hidden');
     document.getElementById('adminViewRoot').classList.remove('hidden');
     document.getElementById('mainNavTab').textContent = 'Admin';
-    document.getElementById('secondNavTab').classList.add('hidden');
     showTab('main');
     const branchOpts = ['TINKUNE','CHABAHIL','NAYA BUSPARK','KALANKI','SATDOBATO','NEWROAD','SWOYAMBHU','BASUNDHARA'];
     ['adminAnnBranch','adminContactBranch'].forEach(idSel => {
@@ -662,23 +538,13 @@ function showApp() {
     document.getElementById('userBranch').innerText = currentBranch;
     document.getElementById('roleBadge').className = '';
     document.getElementById('roleBadge').innerText = '';
-    document.getElementById('headerSub').textContent = 'Scan · Send · Receive · Live';
+    document.getElementById('headerSub').textContent = 'Announcements · Contacts · Live Vans';
     document.getElementById('driverViewRoot').classList.add('hidden');
     document.getElementById('adminViewRoot').classList.add('hidden');
     document.getElementById('branchViewRoot').classList.remove('hidden');
     document.getElementById('annBranchLabel').innerText = currentBranch;
-    document.getElementById('mainNavTab').textContent = 'Send';
-    document.getElementById('secondNavTab').classList.remove('hidden');
-    document.getElementById('secondNavTab').textContent = 'Receive';
+    document.getElementById('mainNavTab').textContent = 'Announcements';
     showTab('main');
-    const destSel = document.getElementById('destBranch');
-    destSel.innerHTML = "";
-    currentDestinations.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d; opt.innerText = d;
-      destSel.appendChild(opt);
-    });
-    document.getElementById('originBranchDisplay').value = currentBranch;
     loadAnnouncements();
     loadContacts();
   }
@@ -690,21 +556,11 @@ function showTab(tab) {
   if (event && event.target) event.target.classList.add('active');
   else document.getElementById(tab === 'vans' ? 'allVansNavTab' : tab === 'second' ? 'secondNavTab' : 'mainNavTab').classList.add('active');
 
+  document.getElementById('mainTab').classList.toggle('hidden', tab !== 'main');
+  document.getElementById('contactsTab').classList.toggle('hidden', tab !== 'second');
   document.getElementById('vansTab').classList.toggle('hidden', tab !== 'vans');
-  document.getElementById('receiveTab').classList.toggle('hidden', tab !== 'second');
 
-  if (currentRole === 'driver') {
-    document.getElementById('driverViewRoot').classList.toggle('hidden', tab !== 'main');
-  } else if (currentRole !== 'admin') {
-    document.getElementById('branchViewRoot').classList.toggle('hidden', tab !== 'main');
-  }
-
-  if (tab === 'second') {
-    document.getElementById('staffBranchDisplay').innerText = getActiveBranch() || 'Check in first';
-    startVanPolling();
-  } else {
-    stopVanPolling();
-  }
+  if (tab === 'second') loadContacts();
   if (tab === 'vans') loadVanBoard();
 }
 
@@ -712,15 +568,6 @@ function logout() {
   localStorage.removeItem('ncm_session');
   localStorage.removeItem('ncm_driver_van');
   location.reload();
-}
-
-// Branch staff receive for their own branch; a driver receives for
-// whichever branch they're currently checked into (empty if not checked in).
-function getActiveBranch() {
-  if (currentRole === 'driver') {
-    return (driverState && driverState.started && driverState.branch) ? driverState.branch : "";
-  }
-  return currentBranch;
 }
 
 /* ===================== ALL VANS — company board ===================== */
@@ -742,41 +589,7 @@ async function loadVanBoard() {
     const vans = res.data || [];
     renderVanBoard(vans, 'vanBoardList');
     renderVanBoard(vans, 'adminVanBoardList');
-    renderSendVanOptions(vans);
   } catch(e) {}
-}
-
-function renderSendVanOptions(vans) {
-  const select = document.getElementById('sendVanNo');
-  const status = document.getElementById('sendVanStatus');
-  if (!select || currentRole !== 'branch') return;
-  const branch = String(currentBranch || '').trim().toUpperCase();
-  const checkedIn = vans.filter(v =>
-    String(v.status || '').toLowerCase() === 'at_branch' &&
-    String(v.branch || '').trim().toUpperCase() === branch
-  );
-  const previous = select.value;
-  select.innerHTML = '';
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = checkedIn.length
-    ? 'Select a driver-checked-in van'
-    : 'No driver-checked-in vans at ' + branch;
-  select.appendChild(placeholder);
-  checkedIn.forEach(v => {
-    const option = document.createElement('option');
-    option.value = String(v.vanNo);
-    option.textContent = 'Van ' + String(v.vanNo) + ' · checked in ' + fmtSeconds(v.elapsedSeconds) + ' ago';
-    select.appendChild(option);
-  });
-  select.disabled = checkedIn.length === 0;
-  if (checkedIn.some(v => String(v.vanNo) === previous)) select.value = previous;
-  if (status) {
-    status.textContent = checkedIn.length
-      ? checkedIn.length + ' van' + (checkedIn.length === 1 ? '' : 's') + ' checked in at ' + branch
-      : 'A driver must check in at ' + branch + ' before shipments can be sent.';
-    status.style.color = checkedIn.length ? '#15803d' : '#a16207';
-  }
 }
 
 function renderVanBoard(vans, listId) {
@@ -786,12 +599,7 @@ function renderVanBoard(vans, listId) {
     list.innerHTML = '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">No van activity yet today.</div>';
     return;
   }
-  const sorted = vans.slice().sort((a,b) => {
-    if (a.status === 'moving' && b.status !== 'moving') return -1;
-    if (a.status !== 'moving' && b.status === 'moving') return 1;
-    return 0;
-  });
-  list.innerHTML = sorted.map(v => {
+  list.innerHTML = vans.map(v => {
     const cls = v.status === 'moving' ? (v.isLate ? 'red' : 'blue') : 'green';
     const time = fmtSeconds(v.elapsedSeconds);
     if (v.status === 'moving') {
@@ -822,7 +630,6 @@ function initDriverView() {
   loadDestinationConfig();
   startDriverPolling();
   flushDriverOutbox();
-  loadContacts();
 }
 
 function confirmVanNo() {
@@ -894,21 +701,16 @@ function setDriverServerStatus(message, kind) {
 
 function renderBranchPickGrid(options, onPick, lockUntilPick) {
   const grid = document.getElementById('branchPickGrid');
-  checkoutOptions = options.slice();
   grid.innerHTML = options.map(b =>
     '<button type="button" class="branch-card" data-b="' + escapeHtml(b) + '">' + escapeHtml(b) + '</button>'
   ).join('');
   grid.querySelectorAll('.branch-card').forEach(btn => {
     let handled = false;
     const chooseBranch = (event) => {
-      // A fresh checkout screen must always accept the first tap. The
-      // disabled property below prevents a second tap while saving.
       if (handled || btn.disabled) return;
       handled = true;
       if (event && event.type === 'touchend' && event.cancelable) event.preventDefault();
       if (lockUntilPick) checkoutInFlight = true;
-      // Instant visual lock-in the moment they tap, before the network call
-      // even starts — this is what makes the flow feel immediate.
       grid.querySelectorAll('.branch-card').forEach(b => b.disabled = true);
       btn.classList.add('picked');
       onPick(btn.dataset.b);
@@ -920,7 +722,6 @@ function renderBranchPickGrid(options, onPick, lockUntilPick) {
 
 function renderInitialBranchPick() {
   pickingNextBranch = false;
-  checkoutOptions = [];
   document.getElementById('branchPickPrompt').textContent = "Select the branch you're at:";
   document.getElementById('branchPickBox').classList.remove('hidden');
   document.getElementById('driverStateBox').classList.add('hidden');
@@ -937,8 +738,6 @@ async function renderNextBranchPick() {
   let options = DRIVER_BRANCH_DESTINATIONS[currentBranch] || mainBranches;
   try {
     const res = await apiGet({ action: 'getDestinations', branch: driverState.branch });
-    // Keep the local driver-only route safe even if an older Apps Script
-    // deployment resolves SWOYAMBHU/BASUNDHARA as a shipment sub-branch.
     if (!DRIVER_BRANCH_DESTINATIONS[currentBranch] && res.success && res.destinations && res.destinations.length) {
       options = res.destinations;
     }
@@ -968,8 +767,6 @@ function renderDriverState() {
   const status = normalizedDriverStatus(driverState);
 
   if (status === 'AT_STATION') {
-    // Keep the checkout choices open during polling. A background refresh
-    // must not remove the buttons before the driver taps one.
     if (pickingNextBranch) {
       pickBox.classList.remove('hidden');
     } else {
@@ -1015,7 +812,7 @@ function renderDriverState() {
 function tickDriverClock() {
   if (driverState && driverState.started) {
     driverState.elapsedSeconds = (Number(driverState.elapsedSeconds) || 0) + 1;
-    if (!document.hidden) renderDriverState(); // keep counting, skip drawing
+    if (!document.hidden) renderDriverState();
   }
 }
 
@@ -1080,6 +877,12 @@ async function submitDriverIssue() {
   } catch(e) { toast('Network error', 'bad'); }
 }
 
+function editVanNo() {
+  document.getElementById('vanNoCard').classList.remove('hidden');
+  document.getElementById('driverVanNoInput').value = driverVanNo;
+  document.getElementById('driverVanNoInput').focus();
+}
+
 /* ===================== ANNOUNCEMENTS & CONTACTS ===================== */
 
 let lastContacts = [];
@@ -1101,7 +904,6 @@ async function loadAnnouncements() {
       : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">No announcements today yet.</div>';
     const el = document.getElementById('announceList'); if (el) el.innerHTML = inner;
     const ael = document.getElementById('adminAnnounceList'); if (ael) ael.innerHTML = inner;
-    // Prefill own announcement so posting again feels like EDIT
     if (currentBranch) {
       const mine = list.find(a => String(a.branch).toUpperCase() === currentBranch);
       const inp = document.getElementById('announceInput');
@@ -1155,6 +957,11 @@ async function loadContacts() {
     const res = await apiGet({ action: 'getBranchContacts' });
     if (!res.success) return;
     lastContacts = res.data || [];
+    const inner = lastContacts.length
+      ? lastContacts.map(c => contactRowHtml(c, currentRole === 'admin')).join('')
+      : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">No contacts saved yet.</div>';
+    const cEl = document.getElementById('contactList'); if (cEl) cEl.innerHTML = inner;
+    const aEl = document.getElementById('adminContactList'); if (aEl) aEl.innerHTML = inner;
     const own = lastContacts.find(c => String(c.branch).toUpperCase() === String(currentBranch || '').toUpperCase());
     const ownEl = document.getElementById('ownContactView');
     if (ownEl) ownEl.innerHTML = own
@@ -1165,14 +972,6 @@ async function loadContacts() {
       if (n && !n.value.trim()) n.value = own.name || '';
       if (p && !p.value.trim()) p.value = own.phone || '';
     }
-    const dEl = document.getElementById('driverContactList');
-    if (dEl) dEl.innerHTML = lastContacts.length
-      ? lastContacts.map(c => contactRowHtml(c, false)).join('')
-      : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">No contacts saved yet.</div>';
-    const aEl = document.getElementById('adminContactList');
-    if (aEl) aEl.innerHTML = lastContacts.length
-      ? lastContacts.map(c => contactRowHtml(c, true)).join('')
-      : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">No contacts saved yet.</div>';
   } catch (e) {}
 }
 
@@ -1199,363 +998,9 @@ async function saveAdminContact() {
   } catch (e) { toast('Network error', 'bad'); }
 }
 
-// Runs inside the 1-minute refresh cycle, only for the data your role uses
 function refreshInfoPanels() {
-  if (currentRole === 'driver') { loadContacts(); return; }
   loadAnnouncements();
   loadContacts();
-}
-
-function editVanNo() {
-  document.getElementById('vanNoCard').classList.remove('hidden');
-  document.getElementById('driverVanNoInput').value = driverVanNo;
-  document.getElementById('driverVanNoInput').focus();
-}
-
-/* ===================== BRANCH: INCOMING VANS ===================== */
-
-function startVanPolling() {
-  loadIncomingVans();
-  if (vanPollInterval) clearInterval(vanPollInterval);
-  vanPollInterval = setInterval(() => {
-    if (!document.hidden) loadIncomingVans();
-  }, VAN_POLL_MS);
-}
-function stopVanPolling() {
-  if (vanPollInterval) clearInterval(vanPollInterval);
-  stopVanTimers();
-}
-
-async function loadIncomingVans() {
-  const branch = getActiveBranch();
-  if (!branch) return;
-  try {
-    const res = await apiGet({ action: "getIncomingVans", branch: branch });
-    if (!res.success) { toast(res.error || 'Server error', 'bad'); return; }
-    const vans = res.data || [];
-    const section = document.getElementById('incomingVansSection');
-    const list = document.getElementById('incomingVansList');
-    if (vans.length === 0) { section.classList.add('hidden'); stopVanTimers(); return; }
-    section.classList.remove('hidden');
-    list.innerHTML = vans.map((v, idx) => {
-      const min = safeNum(v.elapsedMinutes);
-      const sec = safeNum(v.elapsedSeconds);
-      const cls = v.isLate ? 'red' : 'green';
-      return `
-      <div class="van-card ${cls}" onclick="fillVanNo('${escapeHtml(v.vanNo)}')" id="van-${idx}">
-        <div class="van-header">
-          <span class="van-title">Van ${escapeHtml(v.vanNo)} from ${escapeHtml(v.origin)}</span>
-          <span class="van-timer" id="timer-${idx}" data-min="${min}" data-sec="${sec}">${pad(min)}:${pad(sec)}</span>
-        </div>
-        <div class="van-meta">${safeNum(v.count)} shipment(s) coming — Tap to select</div>
-      </div>`;
-    }).join('');
-    startVanTimers();
-  } catch(e) { toast('Failed to load vans: ' + e.message, 'bad'); }
-}
-
-function safeNum(v) { var n = parseInt(v); return isNaN(n) ? 0 : n; }
-function escapeHtml(text) { var div = document.createElement('div'); div.appendChild(document.createTextNode(text)); return div.innerHTML; }
-function pad(n) { var num = safeNum(n); return String(num).padStart(2, '0'); }
-
-function startVanTimers() {
-  if (vanTimerInterval) clearInterval(vanTimerInterval);
-  vanTimerInterval = setInterval(() => {
-    document.querySelectorAll('.van-timer').forEach(el => {
-      let min = safeNum(el.dataset.min);
-      let sec = safeNum(el.dataset.sec);
-      sec++;
-      if (sec >= 60) { sec = 0; min++; }
-      el.dataset.min = min; el.dataset.sec = sec;
-      el.innerText = pad(min) + ':' + pad(sec);
-      const card = el.closest('.van-card');
-      if (min >= 20 && card && card.classList.contains('green')) {
-        card.classList.remove('green'); card.classList.add('red');
-      }
-    });
-  }, 1000);
-}
-function stopVanTimers() { if (vanTimerInterval) clearInterval(vanTimerInterval); }
-
-function fillVanNo(van) {
-  document.getElementById('recvVanNo').value = van;
-  fetchPending();
-  toast('Van ' + van + ' selected', 'ok');
-}
-
-/* ===================== CHIPS ===================== */
-
-function renderChips(containerId, queue, placeholder) {
-  const box = document.getElementById(containerId);
-  if (queue.length === 0) { box.innerHTML = '<span class="chip-placeholder">' + placeholder + '</span>'; return; }
-  box.innerHTML = queue.map(id =>
-    '<span class="chip">' + id + '<button class="x" onclick="removeChip(\'' + containerId + '\',\'' + id + '\')">×</button></span>'
-  ).join('');
-}
-
-function removeChip(containerId, id) {
-  if (containerId === 'sendChipList') {
-    sendQueue = sendQueue.filter(x => x !== id);
-    renderChips('sendChipList', sendQueue, 'Scan or paste shipment IDs here');
-    document.getElementById('sendCount').innerText = sendQueue.length;
-  } else {
-    recvQueue = recvQueue.filter(x => x !== id);
-    renderChips('recvChipList', recvQueue, 'Scanned shipment IDs appear here');
-    updateRecvBtn();
-  }
-}
-
-function addChip(id, containerId, queueArray, placeholder) {
-  id = cleanId(id);
-  if (!id || queueArray.includes(id)) return false;
-  queueArray.push(id);
-  renderChips(containerId === 'sendChipList' ? 'sendChipList' : 'recvChipList', queueArray, placeholder);
-  if (containerId === 'sendChipList') document.getElementById('sendCount').innerText = sendQueue.length;
-  else updateRecvBtn();
-  if (navigator.vibrate) navigator.vibrate(40);
-  return true;
-}
-
-function cleanId(raw) {
-  let id = String(raw).trim();
-  if (id.includes('#')) id = id.split('#').pop();
-  id = id.split(/\s+/)[0];
-  return id.replace(/[^\w\-]/g, '').toUpperCase();
-}
-
-function updateRecvBtn() {
-  const btn = document.getElementById('recvBatchBtn');
-  document.getElementById('scanCount').innerText = recvQueue.length + ' items';
-  document.getElementById('recvBtnCount').innerText = recvQueue.length;
-  btn.disabled = recvQueue.length === 0;
-}
-
-/* ===================== SEND ===================== */
-
-function handleSendInput(el) {
-  const val = el.value;
-  if (val.includes('\n')) {
-    val.split('\n').forEach(p => { if (p.trim()) addChip(p, 'sendChipList', sendQueue, 'Scan or paste shipment IDs here'); });
-    el.value = "";
-  }
-}
-function sendKey(e) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    const val = e.target.value.trim();
-    if (val) { addChip(val, 'sendChipList', sendQueue, 'Scan or paste shipment IDs here'); e.target.value = ""; }
-  }
-}
-function sendPaste(e) {
-  setTimeout(() => {
-    const val = e.target.value;
-    val.split(/[\n,]+/).forEach(p => { if (p.trim()) addChip(p, 'sendChipList', sendQueue, 'Scan or paste shipment IDs here'); });
-    e.target.value = "";
-  }, 10);
-}
-
-async function sendShipments() {
-  const dest = document.getElementById('destBranch').value;
-  const van = document.getElementById('sendVanNo').value.trim();
-  if (!dest) return toast('Select destination', 'bad');
-  if (!van) return toast('Select a van checked in by its driver', 'bad');
-  if (sendQueue.length === 0) return toast('Scan at least one ID', 'bad');
-  toast('Sending ' + sendQueue.length + ' shipments...', 'ok');
-  try {
-    const res = await apiPost({
-      action: "sendBatch", origin: currentBranch, destination: dest, vanNo: van,
-      shipments: sendQueue.map(id => ({ shipmentId: id }))
-    });
-    if (res.success) {
-      let msg = res.sent + ' sent';
-      let bad = 0;
-      if (res.results) {
-        const dupes = res.results.filter(r => r.status === 'duplicate');
-        if (dupes.length) msg += ' | ' + dupes.length + ' already in transit';
-        bad = res.results.filter(r => r.status === 'failed').length;
-      }
-      toast(msg, bad ? 'warn' : 'ok');
-      sendQueue = [];
-      renderChips('sendChipList', [], 'Scan or paste shipment IDs here');
-      document.getElementById('sendCount').innerText = '0';
-    } else {
-      toast(res.error, 'bad');
-    }
-  } catch(e) { toast('Network error', 'bad'); }
-}
-
-/* ===================== RECEIVE ===================== */
-
-function handleRecvInput(el) {
-  const val = el.value;
-  if (val.includes('\n')) {
-    val.split('\n').forEach(p => { if (p.trim()) pushRecv(p); });
-    el.value = "";
-  }
-  scheduleRecvFlush();
-}
-function recvKey(e) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    const val = e.target.value.trim();
-    if (val) { pushRecv(val); e.target.value = ""; }
-    scheduleRecvFlush();
-  }
-}
-function recvPaste(e) {
-  setTimeout(() => {
-    const val = e.target.value;
-    val.split(/[\n,]+/).forEach(p => { if (p.trim()) pushRecv(p); });
-    e.target.value = "";
-    scheduleRecvFlush();
-  }, 10);
-}
-
-function pushRecv(raw) {
-  const id = cleanId(raw);
-  if (!id || recvQueue.includes(id)) return;
-  recvQueue.push(id);
-  renderChips('recvChipList', recvQueue, 'Scanned shipment IDs appear here');
-  updateRecvBtn();
-  if (navigator.vibrate) navigator.vibrate(40);
-}
-
-function scheduleRecvFlush() {
-  clearTimeout(recvTimer);
-  recvTimer = setTimeout(() => { if (recvQueue.length > 0) submitBatch(); }, RECV_AUTO_DELAY);
-}
-
-async function submitBatch() {
-  clearTimeout(recvTimer);
-  const van = document.getElementById('recvVanNo').value.trim();
-  const branch = getActiveBranch();
-  if (!van) return toast('Enter van number', 'bad');
-  if (!branch) return toast('Select a branch first', 'bad');
-  if (recvQueue.length === 0) return;
-  toast('Receiving ' + recvQueue.length + ' shipments...', 'ok');
-  try {
-    const res = await apiPost({ action: "receiveBatch", branch: branch, vanNo: van, shipmentIds: recvQueue });
-    if (res.success) {
-      let msg = res.receivedCount + ' received';
-      if (res.notFoundIds && res.notFoundIds.length) msg += ' | ' + res.notFoundIds.length + ' not found';
-      toast(msg, res.notFoundIds && res.notFoundIds.length ? 'warn' : 'ok');
-      recvQueue = res.notFoundIds || [];
-      renderChips('recvChipList', recvQueue, 'Scanned shipment IDs appear here');
-      updateRecvBtn();
-      fetchPending();
-      loadIncomingVans();
-    } else {
-      toast(res.error || 'Receive failed', 'bad');
-    }
-  } catch(e) { toast('Network error: ' + e.message, 'bad'); }
-}
-
-async function fetchPending() {
-  const van = document.getElementById('recvVanNo').value.trim();
-  const branch = getActiveBranch();
-  if (!van) return toast('Enter van number first', 'bad');
-  if (!branch) return toast('Select a branch first', 'bad');
-  try {
-    const res = await apiGet({ action: "getPendingByVan", branch: branch, vanNo: van });
-    const items = res.data || [];
-    document.getElementById('pendingSection').classList.remove('hidden');
-    document.getElementById('pendingCount').innerText = items.length;
-    const list = document.getElementById('shipmentList');
-    if (items.length === 0) {
-      list.innerHTML = '<div style="padding:14px;text-align:center;color:#94a3b8;font-size:13px">No pending shipments</div>';
-    } else {
-      list.innerHTML = items.map(item =>
-        '<div class="shipment-item"><div><div class="shipment-id">' + item.shipmentId + '</div><div class="shipment-meta">From: ' + item.origin + '</div></div></div>'
-      ).join('');
-    }
-  } catch(e) { toast('Fetch error', 'bad'); }
-}
-
-async function receiveAllSheet() {
-  const van = document.getElementById('recvVanNo').value.trim();
-  const branch = getActiveBranch();
-  if (!van) return toast('Enter van number', 'bad');
-  if (!branch) return toast('Select a branch first', 'bad');
-  try {
-    const res = await apiPost({ action: "receiveAll", branch: branch, vanNo: van });
-    toast(res.message, res.success ? 'ok' : 'bad');
-    if (res.success) { fetchPending(); loadIncomingVans(); }
-  } catch(e) { toast('Error', 'bad'); }
-}
-
-/* ===================== CAMERA ===================== */
-
-async function initDetector() {
-  if ('BarcodeDetector' in window) {
-    try {
-      const formats = await BarcodeDetector.getSupportedFormats();
-      barcodeDetector = new BarcodeDetector({ formats: formats });
-      return true;
-    } catch(e) { return false; }
-  }
-  return false;
-}
-
-async function openCamera(mode) {
-  scanMode = mode;
-  if (mode === 'receive') {
-    const van = document.getElementById('recvVanNo').value.trim();
-    if (!van) return toast('Enter Van Number first', 'bad');
-    if (!getActiveBranch()) return toast('Select branch first', 'bad');
-  }
-  await initDetector();
-  document.getElementById('camModal').classList.add('active');
-  try {
-    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-    const video = document.getElementById('camVideo');
-    video.srcObject = camStream;
-    video.play();
-    isScanning = true;
-    requestAnimationFrame(tick);
-  } catch(e) {
-    toast('Camera error: ' + e.message, 'bad');
-    closeCamera();
-  }
-}
-
-function closeCamera() {
-  isScanning = false;
-  document.getElementById('camModal').classList.remove('active');
-  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
-}
-
-let lastScanTime = 0;
-async function tick() {
-  if (!isScanning) return;
-  const video = document.getElementById('camVideo');
-  if (video.readyState !== video.HAVE_ENOUGH_DATA) { requestAnimationFrame(tick); return; }
-  const now = Date.now();
-  if (now - lastScanTime < 350) { requestAnimationFrame(tick); return; }
-  const canvas = document.getElementById('camCanvas');
-  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  let code = null;
-  if (barcodeDetector) {
-    try { const codes = await barcodeDetector.detect(canvas); if (codes.length) code = codes[0].rawValue; }
-    catch(e) {}
-  }
-  if (code) {
-    lastScanTime = now;
-    const clean = cleanId(code);
-    if (scanMode === 'send') {
-      if (addChip(clean, 'sendChipList', sendQueue, 'Scan or paste shipment IDs here')) toast('Scanned: ' + clean, 'ok');
-    } else {
-      if (!recvQueue.includes(clean)) {
-        recvQueue.push(clean);
-        renderChips('recvChipList', recvQueue, 'Scanned shipment IDs appear here');
-        updateRecvBtn();
-        scheduleRecvFlush();
-        toast('Scanned: ' + clean, 'ok');
-      }
-    }
-  }
-  requestAnimationFrame(tick);
 }
 
 /* ===================== HELPERS ===================== */
@@ -1577,6 +1022,8 @@ function toast(msg, type) {
   t._tm = setTimeout(() => t.style.display = 'none', 3000);
 }
 
+function escapeHtml(text) { var div = document.createElement('div'); div.appendChild(document.createTextNode(text)); return div.innerHTML; }
+
 window.addEventListener('online', () => {
   toast('Connection restored. Uploading driver updates…', 'ok');
   flushDriverOutbox();
@@ -1584,8 +1031,6 @@ window.addEventListener('online', () => {
 window.addEventListener('offline', () => {
   if (pendingDriverOperations().length) setDriverPendingStatus();
 });
-// Refresh immediately when the user returns to the tab, so slower
-// polling never makes the screen feel stale.
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     if (driverVanNo) loadDriverState();
