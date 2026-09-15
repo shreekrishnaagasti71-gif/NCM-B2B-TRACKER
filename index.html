@@ -81,6 +81,10 @@ input:focus,select:focus{outline:none;border-color:#dc2626}
 .edit-modal h3{font-size:16px;margin-bottom:12px}
 .edit-modal .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 .edit-modal input,.edit-modal select{font-size:14px}
+body.driver-portal .branch-nav-tab,body.driver-portal .company-nav-tab{display:none!important}
+body.driver-portal .nav-tabs{display:block}
+body.driver-portal .nav-tab{display:block;width:100%}
+.driver-connection-retry{display:inline-block;margin-left:5px;color:#2563eb;text-decoration:underline;cursor:pointer;font-weight:800}
 </style>
 <base target="_blank">
 </head>
@@ -117,8 +121,8 @@ input:focus,select:focus{outline:none;border-color:#dc2626}
 
     <div class="nav-tabs">
       <div class="nav-tab active" id="mainNavTab" onclick="showTab('main')">-</div>
-      <div class="nav-tab" id="secondNavTab" onclick="showTab('second')">Contacts</div>
-      <div class="nav-tab" id="allVansNavTab" onclick="showTab('vans')">All Vans</div>
+      <div class="nav-tab branch-nav-tab" id="secondNavTab" onclick="showTab('second')">Contacts</div>
+      <div class="nav-tab company-nav-tab" id="allVansNavTab" onclick="showTab('vans')">All Vans</div>
     </div>
 
     <!-- ============ MAIN TAB: ANNOUNCEMENTS (branch) / CHECK IN-OUT (driver) / ADMIN ============ -->
@@ -269,7 +273,7 @@ input:focus,select:focus{outline:none;border-color:#dc2626}
 <div class="build-tag" id="buildTag"></div>
 
 <script>
-const APP_VERSION = "v25-driver-stable";
+const APP_VERSION = "v26-split-portals";
 let SCRIPT_URL = localStorage.getItem('ncm_url') || "";
 let currentBranch = "";
 let currentRole = "";
@@ -305,6 +309,10 @@ let driverOutbox = loadDriverOutbox();
 let driverSyncInFlight = false;
 let driverStateInFlight = false;
 let movementEditType = '';
+let branchPortalPollInterval = null;
+let driverFailureCount = 0;
+let driverRetryTimer = null;
+let driverPollBlockedUntil = 0;
 
 function loadDriverOutbox() {
   try {
@@ -406,6 +414,10 @@ async function flushDriverOutbox() {
         saveDriverOutbox();
         const res = await apiPost(Object.assign({}, op.data, { clientId: op.id }));
         if (!res || !res.success) {
+          if (res && res.retryable) {
+            setDriverPendingStatus();
+            break;
+          }
           removeDriverOperation(op.id);
           await loadDriverState();
           setDriverServerStatus('Apps Script: ' + ((res && res.error) || 'action rejected'), 'bad');
@@ -545,6 +557,7 @@ function showApp() {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('mainApp').classList.remove('hidden');
   document.getElementById('statusBar').classList.remove('hidden');
+  setPortalMode(currentRole);
 
   if (currentRole === 'driver') {
     document.getElementById('userBranch').innerText = 'DRIVER';
@@ -580,6 +593,7 @@ function showApp() {
     loadAnnouncements();
     loadContacts();
     startVanBoardPolling();
+    startBranchPortalPolling();
   } else {
     document.getElementById('userBranch').innerText = currentBranch;
     document.getElementById('roleBadge').className = '';
@@ -593,7 +607,40 @@ function showApp() {
     showTab('main');
     loadAnnouncements();
     loadContacts();
+    startBranchPortalPolling();
   }
+}
+
+function setPortalMode(role) {
+  document.body.classList.remove('driver-portal', 'branch-portal', 'admin-portal');
+  if (role === 'driver') {
+    document.body.classList.add('driver-portal');
+    stopBranchPortalPolling();
+    stopVanBoardPolling();
+  } else if (role === 'admin') {
+    document.body.classList.add('admin-portal');
+  } else {
+    document.body.classList.add('branch-portal');
+  }
+}
+
+function stopBranchPortalPolling() {
+  if (branchPortalPollInterval) {
+    clearInterval(branchPortalPollInterval);
+    branchPortalPollInterval = null;
+  }
+}
+
+function startBranchPortalPolling() {
+  if (currentRole !== 'branch' && currentRole !== 'admin') return;
+  stopBranchPortalPolling();
+  branchPortalPollInterval = setInterval(() => {
+    if (document.hidden) return;
+    // Branch/admin refreshes stay on their own portal and never call
+    // getDriverState or touch driver controls.
+    loadAnnouncements();
+    loadContacts();
+  }, 60000);
 }
 
 function showTab(tab, evt) {
@@ -605,11 +652,14 @@ function showTab(tab, evt) {
   document.getElementById('contactsTab').classList.toggle('hidden', tab !== 'second');
   document.getElementById('vansTab').classList.toggle('hidden', tab !== 'vans');
 
-  if (tab === 'second') loadContacts();
-  if (tab === 'vans') startVanBoardPolling();
+  if (tab === 'second' && currentRole !== 'driver') loadContacts();
+  if (tab === 'vans' && currentRole !== 'driver') startVanBoardPolling();
 }
 
 function logout() {
+  stopBranchPortalPolling();
+  stopVanBoardPolling();
+  stopDriverPolling();
   localStorage.removeItem('ncm_session');
   localStorage.removeItem('ncm_driver_van');
   location.reload();
@@ -618,7 +668,9 @@ function logout() {
 /* ===================== ALL VANS — company board ===================== */
 
 function startVanBoardPolling() {
-  if (vanBoardPollInterval) clearInterval(vanBoardPollInterval);
+  if (currentRole === 'driver') return;
+  if (vanBoardPollInterval) return;
+  vanBoardLoaded = false;
   loadVanBoard();
   vanBoardPollInterval = setInterval(() => {
     if (document.hidden) return;
@@ -628,6 +680,13 @@ function startVanBoardPolling() {
       pollTrackedLiveVans();
     }
   }, VAN_BOARD_POLL_MS);
+}
+
+function stopVanBoardPolling() {
+  if (vanBoardPollInterval) {
+    clearInterval(vanBoardPollInterval);
+    vanBoardPollInterval = null;
+  }
 }
 
 async function loadVanBoard() {
@@ -738,8 +797,24 @@ function startDriverPolling() {
   driverTickInterval = setInterval(tickDriverClock, 1000);
 }
 
+function stopDriverPolling() {
+  if (driverPollInterval) {
+    clearInterval(driverPollInterval);
+    driverPollInterval = null;
+  }
+  if (driverTickInterval) {
+    clearInterval(driverTickInterval);
+    driverTickInterval = null;
+  }
+  if (driverRetryTimer) {
+    clearTimeout(driverRetryTimer);
+    driverRetryTimer = null;
+  }
+}
+
 async function loadDriverState() {
   if (!driverVanNo) return false;
+  if (Date.now() < driverPollBlockedUntil) return false;
   if (driverStateInFlight) return false;
   if (pendingDriverOperations().length) {
     applyPendingDriverState();
@@ -756,12 +831,31 @@ async function loadDriverState() {
       const looksLikeDowngrade = driverState && driverState.started && !res.state.started;
       if (recentlyConfirmed && looksLikeDowngrade) return true;
       driverState = res.state;
+      driverFailureCount = 0;
+      if (driverRetryTimer) {
+        clearTimeout(driverRetryTimer);
+        driverRetryTimer = null;
+      }
       cacheDriverState();
       renderDriverState();
       return true;
     }
+    throw new Error((res && res.error) || 'Driver state unavailable');
   } catch(e) {
-    setDriverServerStatus('Cannot read status from Apps Script.', 'bad');
+    driverFailureCount++;
+    if (driverState) renderDriverState();
+    if (driverFailureCount < 3) {
+      setDriverServerStatus('Connection delayed — retrying…', 'pending');
+    } else {
+      setDriverServerStatus('Cannot read status from Apps Script. Retrying…', 'bad');
+    }
+    if (!driverRetryTimer) {
+      const retryMs = Math.min(4000, 700 * Math.max(1, driverFailureCount));
+      driverRetryTimer = setTimeout(() => {
+        driverRetryTimer = null;
+        loadDriverState();
+      }, retryMs);
+    }
   } finally {
     driverStateInFlight = false;
   }
@@ -991,6 +1085,7 @@ function driverCheckOutStart() {
 
 async function driverDoCheckIn(branch) {
   const previous = driverState;
+  driverPollBlockedUntil = Date.now() + 2500;
   driverState = { vanNo: driverVanNo, started: true, branch: branch, nextBranch: null, status: 'AT_STATION', elapsedSeconds: 0, round: (previous && previous.round) || 1 };
   cacheDriverState();
   queueDriverOperation('driverCheckIn', { action: 'driverCheckIn', vanNo: driverVanNo, branch: branch });
@@ -1005,6 +1100,7 @@ async function driverDoCheckIn(branch) {
 async function driverDoCheckOut(nextBranch) {
   const previous = driverState;
   const atBranch = driverState.branch;
+  driverPollBlockedUntil = Date.now() + 2500;
   driverState = { vanNo: driverVanNo, started: true, branch: atBranch, nextBranch: nextBranch, status: 'MOVING', elapsedSeconds: 0, round: previous.round || 1 };
   cacheDriverState();
   queueDriverOperation('driverCheckOut', {
@@ -1173,22 +1269,28 @@ function toast(msg, type) {
 function escapeHtml(text) { var div = document.createElement('div'); div.appendChild(document.createTextNode(text)); return div.innerHTML; }
 
 window.addEventListener('online', () => {
-  toast('Connection restored. Uploading driver updates…', 'ok');
-  flushDriverOutbox();
+  if (currentRole === 'driver') {
+    toast('Connection restored. Uploading driver updates…', 'ok');
+    flushDriverOutbox();
+    loadDriverState();
+  }
 });
 window.addEventListener('offline', () => {
-  if (pendingDriverOperations().length) setDriverPendingStatus();
+  if (currentRole === 'driver' && pendingDriverOperations().length) setDriverPendingStatus();
 });
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
-    if (driverVanNo) loadDriverState();
-    loadVanBoard();
-    flushDriverOutbox();
-    refreshInfoPanels();
+    if (currentRole === 'driver') {
+      if (driverVanNo) loadDriverState();
+      flushDriverOutbox();
+    } else {
+      if (vanBoardPollInterval) loadVanBoard();
+      refreshInfoPanels();
+    }
   }
 });
 setInterval(() => {
-  if (driverOutbox.length && !document.hidden) flushDriverOutbox();
+  if (currentRole === 'driver' && driverOutbox.length && !document.hidden) flushDriverOutbox();
 }, OUTBOX_FLUSH_MS);
 
 updateLiveClock();
