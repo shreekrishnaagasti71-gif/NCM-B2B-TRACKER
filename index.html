@@ -209,6 +209,24 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
           <button class="scan-big" onclick="openCamera('send')">📷 Scan Barcodes</button>
           <button class="btn btn-red mt-10" onclick="sendShipments()">SEND ALL (<span id="sendCount">0</span>)</button>
         </div>
+
+        <div class="card">
+          <h4>📢 Announcements — Today</h4>
+          <div id="announceList" style="font-size:13px;color:#64748b">Loading…</div>
+          <label class="mt-10">Post / edit today's announcement for <b id="annBranchLabel" style="color:#dc2626">-</b></label>
+          <textarea id="announceInput" style="width:100%;min-height:60px;margin-top:5px;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font:14px inherit" placeholder="Write today's announcement for your branch…"></textarea>
+          <button class="btn btn-blue mt-10" onclick="postAnnouncement()">POST / UPDATE ANNOUNCEMENT</button>
+        </div>
+
+        <div class="card">
+          <h4>📇 Branch Contact Person</h4>
+          <div id="ownContactView" style="font-size:13px;color:#64748b">Loading…</div>
+          <label class="mt-10">Contact Person Name</label>
+          <input type="text" id="contactNameInput" placeholder="e.g. Babu Ram Upadhyaya">
+          <label class="mt-10">Phone</label>
+          <input type="text" id="contactPhoneInput" placeholder="e.g. 9701010307">
+          <button class="btn btn-blue mt-10" onclick="saveContact()">SAVE CONTACT (EDIT ANY TIME)</button>
+        </div>
       </div>
     </div>
 
@@ -223,7 +241,10 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
       </div>
 
       <div class="card hidden" id="driverCard">
-        <h4>📍 Check In / Check Out <span class="round-badge" id="roundBadge">Round 1</span></h4>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+          <h4 style="flex:1;margin:0">📍 Check In / Check Out <span class="round-badge" id="roundBadge">Round 1</span></h4>
+          <button class="btn btn-grey btn-small" onclick="editVanNo()">✏️ Edit</button>
+        </div>
         <p style="font-size:12px;color:#64748b;margin-bottom:6px">Van <b id="driverVanLabel">-</b></p>
 
         <div id="branchPickBox">
@@ -244,10 +265,45 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
         </div>
       </div>
 
+      <div class="card">
+        <h4>📇 Branch Contact Persons</h4>
+        <p style="font-size:11px;color:#94a3b8;margin-bottom:6px">Tap a number to call.</p>
+        <div id="driverContactList" style="font-size:13px">Loading…</div>
+      </div>
+
       <div class="card issue-box">
         <h4>📝 Report an Issue</h4>
         <textarea id="driverIssueInput" placeholder="Example: Van delayed, road blocked, etc."></textarea>
         <button class="btn btn-grey mt-10" onclick="submitDriverIssue()">Send Issue to Admin</button>
+      </div>
+    </div>
+
+    <!-- ============ ADMIN VIEW — announcements + contacts + all vans ============ -->
+    <div id="adminViewRoot" class="hidden">
+      <div class="card">
+        <h4>📢 Branch Announcements — Today</h4>
+        <div id="adminAnnounceList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
+        <label class="mt-10">Post / update as branch</label>
+        <select id="adminAnnBranch"></select>
+        <textarea id="adminAnnInput" style="width:100%;min-height:60px;margin-top:8px;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font:14px inherit" placeholder="Write today's announcement…"></textarea>
+        <button class="btn btn-blue mt-10" onclick="postAdminAnnouncement()">POST / UPDATE ANNOUNCEMENT</button>
+      </div>
+
+      <div class="card">
+        <h4>📇 Branch Contact Details</h4>
+        <div id="adminContactList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
+        <label class="mt-10">Branch</label>
+        <select id="adminContactBranch"></select>
+        <label class="mt-10">Contact Person</label>
+        <input type="text" id="adminContactName" placeholder="Name">
+        <label class="mt-10">Phone</label>
+        <input type="text" id="adminContactPhone" placeholder="Phone">
+        <button class="btn btn-blue mt-10" onclick="saveAdminContact()">SAVE / UPDATE CONTACT</button>
+      </div>
+
+      <div class="card">
+        <h4>🚐 All Vans — Live Board (1-min auto refresh)</h4>
+        <div id="adminVanBoardList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
       </div>
     </div>
 
@@ -277,7 +333,7 @@ input[readonly],input:disabled{background:#f8fafc;color:#2563eb;font-weight:700;
 </div>
 
 <script>
-const APP_VERSION = "v21-smart-polling";
+const APP_VERSION = "v22-admin-panels";
 const MIN_TRAVEL_SECONDS = 120;
 let SCRIPT_URL = localStorage.getItem('ncm_url') || "";
 let currentBranch = "";
@@ -297,7 +353,7 @@ const RECV_AUTO_DELAY = 600;
 // SMART POLLING: slower intervals + pause when tab is in background.
 // The server caches reads, so fast polling no longer helps anyone.
 const DRIVER_POLL_MS = 15000;    // driver status: 15s (was 5s)
-const VAN_BOARD_POLL_MS = 30000; // company board: 30s (was 8s)
+const VAN_BOARD_POLL_MS = 60000; // company board: 1 min, as requested
 const VAN_POLL_MS = 30000;       // incoming vans: 30s (was 10s)
 const OUTBOX_FLUSH_MS = 10000;   // offline outbox: 10s (was 5s)
 
@@ -579,13 +635,38 @@ function showApp() {
     document.getElementById('secondNavTab').textContent = 'Receive';
     showTab('main');
     initDriverView();
+  } else if (currentRole === 'admin') {
+    document.getElementById('userBranch').innerText = 'ADMIN';
+    document.getElementById('roleBadge').className = 'driver-badge';
+    document.getElementById('roleBadge').innerText = 'ADMIN';
+    document.getElementById('headerSub').textContent = 'Announce · Contacts · All Vans';
+    document.getElementById('branchViewRoot').classList.add('hidden');
+    document.getElementById('driverViewRoot').classList.add('hidden');
+    document.getElementById('adminViewRoot').classList.remove('hidden');
+    document.getElementById('mainNavTab').textContent = 'Admin';
+    document.getElementById('secondNavTab').classList.add('hidden');
+    showTab('main');
+    const branchOpts = ['TINKUNE','CHABAHIL','NAYA BUSPARK','KALANKI','SATDOBATO','NEWROAD','SWOYAMBHU','BASUNDHARA'];
+    ['adminAnnBranch','adminContactBranch'].forEach(idSel => {
+      const sel = document.getElementById(idSel);
+      sel.innerHTML = '';
+      branchOpts.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b; opt.innerText = b;
+        sel.appendChild(opt);
+      });
+    });
+    loadAnnouncements();
+    loadContacts();
   } else {
     document.getElementById('userBranch').innerText = currentBranch;
     document.getElementById('roleBadge').className = '';
     document.getElementById('roleBadge').innerText = '';
     document.getElementById('headerSub').textContent = 'Scan · Send · Receive · Live';
     document.getElementById('driverViewRoot').classList.add('hidden');
+    document.getElementById('adminViewRoot').classList.add('hidden');
     document.getElementById('branchViewRoot').classList.remove('hidden');
+    document.getElementById('annBranchLabel').innerText = currentBranch;
     document.getElementById('mainNavTab').textContent = 'Send';
     document.getElementById('secondNavTab').classList.remove('hidden');
     document.getElementById('secondNavTab').textContent = 'Receive';
@@ -598,6 +679,8 @@ function showApp() {
       destSel.appendChild(opt);
     });
     document.getElementById('originBranchDisplay').value = currentBranch;
+    loadAnnouncements();
+    loadContacts();
   }
   startVanBoardPolling();
 }
@@ -612,7 +695,7 @@ function showTab(tab) {
 
   if (currentRole === 'driver') {
     document.getElementById('driverViewRoot').classList.toggle('hidden', tab !== 'main');
-  } else {
+  } else if (currentRole !== 'admin') {
     document.getElementById('branchViewRoot').classList.toggle('hidden', tab !== 'main');
   }
 
@@ -646,7 +729,9 @@ function startVanBoardPolling() {
   loadVanBoard();
   if (vanBoardPollInterval) clearInterval(vanBoardPollInterval);
   vanBoardPollInterval = setInterval(() => {
-    if (!document.hidden) loadVanBoard();
+    if (document.hidden) return;
+    loadVanBoard();
+    refreshInfoPanels();
   }, VAN_BOARD_POLL_MS);
 }
 
@@ -655,7 +740,8 @@ async function loadVanBoard() {
     const res = await apiGet({ action: 'getVanBoard' });
     if (!res.success) return;
     const vans = res.data || [];
-    renderVanBoard(vans);
+    renderVanBoard(vans, 'vanBoardList');
+    renderVanBoard(vans, 'adminVanBoardList');
     renderSendVanOptions(vans);
   } catch(e) {}
 }
@@ -693,8 +779,8 @@ function renderSendVanOptions(vans) {
   }
 }
 
-function renderVanBoard(vans) {
-  const list = document.getElementById('vanBoardList');
+function renderVanBoard(vans, listId) {
+  const list = document.getElementById(listId || 'vanBoardList');
   if (!list) return;
   if (!vans.length) {
     list.innerHTML = '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">No van activity yet today.</div>';
@@ -736,6 +822,7 @@ function initDriverView() {
   loadDestinationConfig();
   startDriverPolling();
   flushDriverOutbox();
+  loadContacts();
 }
 
 function confirmVanNo() {
@@ -991,6 +1078,138 @@ async function submitDriverIssue() {
     toast(res.message || res.error, res.success ? 'ok' : 'bad');
     if (res.success) input.value = '';
   } catch(e) { toast('Network error', 'bad'); }
+}
+
+/* ===================== ANNOUNCEMENTS & CONTACTS ===================== */
+
+let lastContacts = [];
+
+function announcementRowHtml(a) {
+  return '<div style="padding:10px 0;border-bottom:1px solid #f1f5f9">' +
+    '<div style="font-weight:800;color:#dc2626;font-size:12px">' + escapeHtml(a.branch) +
+    ' <span style="color:#94a3b8;font-weight:600">· ' + escapeHtml(String(a.time || '')) + '</span></div>' +
+    '<div style="font-size:13px;color:#1e293b;margin-top:2px">' + escapeHtml(a.message) + '</div></div>';
+}
+
+async function loadAnnouncements() {
+  try {
+    const res = await apiGet({ action: 'getAnnouncements' });
+    if (!res.success) return;
+    const list = res.data || [];
+    const inner = list.length
+      ? list.map(announcementRowHtml).join('')
+      : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">No announcements today yet.</div>';
+    const el = document.getElementById('announceList'); if (el) el.innerHTML = inner;
+    const ael = document.getElementById('adminAnnounceList'); if (ael) ael.innerHTML = inner;
+    // Prefill own announcement so posting again feels like EDIT
+    if (currentBranch) {
+      const mine = list.find(a => String(a.branch).toUpperCase() === currentBranch);
+      const inp = document.getElementById('announceInput');
+      if (inp && mine && !inp.value.trim()) inp.value = mine.message;
+    }
+  } catch (e) {}
+}
+
+async function postAnnouncement() {
+  const msg = document.getElementById('announceInput').value.trim();
+  if (!msg) return toast('Write the announcement first', 'bad');
+  try {
+    const res = await apiPost({ action: 'putAnnouncement', branch: currentBranch, message: msg });
+    toast(res.message || res.error, res.success ? 'ok' : 'bad');
+    if (res.success) loadAnnouncements();
+  } catch (e) { toast('Network error', 'bad'); }
+}
+
+async function postAdminAnnouncement() {
+  const branch = document.getElementById('adminAnnBranch').value;
+  const msg = document.getElementById('adminAnnInput').value.trim();
+  if (!msg) return toast('Write the announcement first', 'bad');
+  try {
+    const res = await apiPost({ action: 'putAnnouncement', branch: branch, message: msg });
+    toast(res.message || res.error, res.success ? 'ok' : 'bad');
+    if (res.success) { document.getElementById('adminAnnInput').value = ''; loadAnnouncements(); }
+  } catch (e) { toast('Network error', 'bad'); }
+}
+
+function contactRowHtml(c, editable) {
+  const esc = escapeHtml;
+  return '<div style="padding:9px 0;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+    '<div><div style="font-weight:800;color:#1e293b;font-size:13px">' + esc(c.branch) + '</div>' +
+    '<div style="font-size:12px;color:#64748b">' + esc(c.name) + ' · <a href="tel:' + esc(String(c.phone)) + '" style="color:#2563eb;font-weight:700">' + esc(c.phone) + '</a></div></div>' +
+    (editable ? '<button class="btn btn-grey btn-small" onclick="fillAdminContact(\'' + esc(c.branch) + '\')">✏️ Edit</button>' : '') +
+    '</div>';
+}
+
+function fillAdminContact(branch) {
+  const c = lastContacts.find(x => String(x.branch).toUpperCase() === String(branch).toUpperCase());
+  document.getElementById('adminContactBranch').value = String(branch).toUpperCase();
+  if (c) {
+    document.getElementById('adminContactName').value = c.name || '';
+    document.getElementById('adminContactPhone').value = c.phone || '';
+  }
+  toast('Editing ' + branch, 'ok');
+}
+
+async function loadContacts() {
+  try {
+    const res = await apiGet({ action: 'getBranchContacts' });
+    if (!res.success) return;
+    lastContacts = res.data || [];
+    const own = lastContacts.find(c => String(c.branch).toUpperCase() === String(currentBranch || '').toUpperCase());
+    const ownEl = document.getElementById('ownContactView');
+    if (ownEl) ownEl.innerHTML = own
+      ? '<b style="color:#1e293b">' + escapeHtml(own.name) + '</b> · <a href="tel:' + escapeHtml(String(own.phone)) + '" style="color:#2563eb;font-weight:700">' + escapeHtml(own.phone) + '</a>'
+      : 'No contact saved yet for ' + escapeHtml(currentBranch || 'this branch') + '.';
+    if (own && currentBranch) {
+      const n = document.getElementById('contactNameInput'), p = document.getElementById('contactPhoneInput');
+      if (n && !n.value.trim()) n.value = own.name || '';
+      if (p && !p.value.trim()) p.value = own.phone || '';
+    }
+    const dEl = document.getElementById('driverContactList');
+    if (dEl) dEl.innerHTML = lastContacts.length
+      ? lastContacts.map(c => contactRowHtml(c, false)).join('')
+      : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">No contacts saved yet.</div>';
+    const aEl = document.getElementById('adminContactList');
+    if (aEl) aEl.innerHTML = lastContacts.length
+      ? lastContacts.map(c => contactRowHtml(c, true)).join('')
+      : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">No contacts saved yet.</div>';
+  } catch (e) {}
+}
+
+async function saveContact() {
+  const name = document.getElementById('contactNameInput').value.trim();
+  const phone = document.getElementById('contactPhoneInput').value.trim();
+  if (!name || !phone) return toast('Enter name and phone', 'bad');
+  try {
+    const res = await apiPost({ action: 'saveBranchContact', branch: currentBranch, name: name, phone: phone });
+    toast(res.message || res.error, res.success ? 'ok' : 'bad');
+    if (res.success) loadContacts();
+  } catch (e) { toast('Network error', 'bad'); }
+}
+
+async function saveAdminContact() {
+  const branch = document.getElementById('adminContactBranch').value;
+  const name = document.getElementById('adminContactName').value.trim();
+  const phone = document.getElementById('adminContactPhone').value.trim();
+  if (!name || !phone) return toast('Enter name and phone', 'bad');
+  try {
+    const res = await apiPost({ action: 'saveBranchContact', branch: branch, name: name, phone: phone });
+    toast(res.message || res.error, res.success ? 'ok' : 'bad');
+    if (res.success) loadContacts();
+  } catch (e) { toast('Network error', 'bad'); }
+}
+
+// Runs inside the 1-minute refresh cycle, only for the data your role uses
+function refreshInfoPanels() {
+  if (currentRole === 'driver') { loadContacts(); return; }
+  loadAnnouncements();
+  loadContacts();
+}
+
+function editVanNo() {
+  document.getElementById('vanNoCard').classList.remove('hidden');
+  document.getElementById('driverVanNoInput').value = driverVanNo;
+  document.getElementById('driverVanNoInput').focus();
 }
 
 /* ===================== BRANCH: INCOMING VANS ===================== */
@@ -1372,6 +1591,7 @@ document.addEventListener('visibilitychange', () => {
     if (driverVanNo) loadDriverState();
     loadVanBoard();
     flushDriverOutbox();
+    refreshInfoPanels();
   }
 });
 setInterval(() => {
