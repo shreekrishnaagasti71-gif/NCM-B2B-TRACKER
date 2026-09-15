@@ -1,28 +1,19 @@
 // ═══════════════════════════════════════════════════════
-//  NCM B2B TRACKER — BACKEND v8 (smart polling + admin panels)
-//  New in this version:
-//   • Round detection for drivers: a round closes whenever the van
-//     checks back into TINKUNE. The branches visited since the last
-//     TINKUNE check-in are compared against the 6 core branches
-//     (Chabahil, Basundhara, Naya Buspark, Swoyambhu, Kalanki,
-//     Satdobato) — skipping one is fine, it's just reported as missed,
-//     not blocked.
-//   • Readable Hold Time / Travel Time text columns alongside the raw
-//     seconds, so the sheet itself is easy to read.
-//   • getVanBoard(): a fast, company-wide "where is every van right now"
-//     list — now additionally CACHED for 30s so 50 phones polling no
-//     longer means 50 sheet reads per minute.
-//   • Script Cache on driver state + van board: polling no longer
-//     re-reads sheets on every request; writes invalidate the cache.
-//  Branch Send/Receive system is unchanged.
-//  Open from: Extensions → Apps Script inside your sheet
-//  After pasting: Deploy → Manage deployments → Edit → New version → Deploy
+//  NCM B2B TRACKER — BACKEND v9 (no shipments)
+//  This version REMOVES the whole Send/Receive shipment
+//  system and the "SHIPMENT GPS" sheet. The app is now:
+//    • Driver check-in / check-out with round detection
+//    • Live "All Vans" board
+//    • Branch announcements (post/edit, one per branch per day)
+//    • Branch contact persons (tappable to call)
+//    • Issue reporting
+//  Old sheet cleanup: you may delete the "SHIPMENT GPS"
+//  sheet from the spreadsheet — nothing reads it anymore.
+//  Deploy → Manage deployments → Edit → New version → Deploy
 // ═══════════════════════════════════════════════════════
 
 const CONFIG = {
-  SHEET_NAME: "SHIPMENT GPS",
-  TIMEZONE: "Asia/Kathmandu",
-  TOTAL_COLS: 9
+  TIMEZONE: "Asia/Kathmandu"
 };
 
 const PASSCODES = {
@@ -52,24 +43,13 @@ const MAIN_BRANCHES = Object.keys(DESTINATIONS);
 // The 6 core stops a full round should touch, besides Tinkune (start/end).
 const ROUND_CORE_BRANCHES = ["CHABAHIL","BASUNDHARA","NAYA BUSPARK","SWOYAMBHU","KALANKI","SATDOBATO"];
 
-const SUB_BRANCHES = {
-  "KAPAN":"CHABAHIL","BUDHANILKANTHA":"CHABAHIL","SANKHU":"CHABAHIL","SUNDARIJAL":"CHABAHIL",
-  "NAYA THIMI":"TINKUNE","SURYABINAYAK":"TINKUNE","LUBHU":"TINKUNE",
-  "GODAWARI":"SATDOBATO","CHAPAGAU":"SATDOBATO",
-  "SWOYAMBHU":"NAYA BUSPARK","BASUNDHARA":"NAYA BUSPARK",
-  "THANKOT":"KALANKI"
-};
-
 const MIN_TRAVEL_SECONDS = 120;
 const EXPECTED_LEG_MINUTES = 10;
 
-/* ═══ SMART POLLING CACHE ═══
-   Every phone polls every few seconds, and each poll used to re-read the
-   whole sheet. Apps Script has strict daily quotas, so the app got slower
-   as more people used it. This cache lets ONE sheet read serve EVERYONE
-   for a short window. All writes invalidate the cache, so data stays fresh. */
+/* ═══ SMART POLLING CACHE ═══ */
 const DRIVER_STATE_TTL = 60;  // seconds
 const VAN_BOARD_TTL = 30;     // seconds
+const INFO_TTL = 60;          // seconds
 
 function getCached_(key) {
   try { return CacheService.getScriptCache().get(key); } catch (e) { return null; }
@@ -83,14 +63,6 @@ function removeCached_(key) {
 function invalidateDriverCaches(vanNo) {
   removeCached_('drv_state_' + String(vanNo || '').trim());
   removeCached_('van_board_raw_' + today());
-}
-
-const COL = { DATE:1, ORIGIN:2, DEST:3, SEND_TIME:4, ID:5, VAN:6, STATUS:7, RECV_BY:8, RECV_TIME:9 };
-
-function resolveMainBranch(name) {
-  if (!name) return name;
-  var upper = name.toString().toUpperCase().trim();
-  return SUB_BRANCHES[upper] || upper;
 }
 
 function today() {
@@ -120,241 +92,6 @@ function timeLabel(seconds) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   BRANCH SIDE — shipment Send/Receive (unchanged behavior)
-═══════════════════════════════════════════════════════ */
-
-function getSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(CONFIG.SHEET_NAME);
-    sheet.appendRow(["Date","Origin","Destination","Send Time","Shipment ID","Van No","Status","Received By","Received Time"]);
-    sheet.setFrozenRows(1);
-  }
-  var lastCol = sheet.getLastColumn();
-  if (lastCol < CONFIG.TOTAL_COLS) sheet.insertColumnsAfter(lastCol, CONFIG.TOTAL_COLS - lastCol);
-  return sheet;
-}
-
-function getAllValues(sheet) {
-  var lr = sheet.getLastRow();
-  if (lr < 1) lr = 1;
-  return sheet.getRange(1, 1, lr, CONFIG.TOTAL_COLS).getValues();
-}
-
-function setAllValues(sheet, values) {
-  var lr = values.length;
-  if (lr < 1) lr = 1;
-  sheet.getRange(1, 1, lr, CONFIG.TOTAL_COLS).setValues(values);
-}
-
-function parseDateTime(dateVal, timeVal) {
-  var d;
-  try {
-    if (dateVal instanceof Date) {
-      d = new Date(dateVal.getFullYear(), dateVal.getMonth(), dateVal.getDate());
-    } else {
-      var ds = String(dateVal).trim();
-      var m = ds.match(/(\d{4})-(\d{2})-(\d{2})/);
-      d = m ? new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3])) : new Date(ds);
-    }
-  } catch(e) { d = new Date(); }
-  if (!d || isNaN(d.getTime())) d = new Date();
-
-  var h = 0, mn = 0, s = 0;
-  try {
-    if (timeVal instanceof Date) {
-      h = timeVal.getHours(); mn = timeVal.getMinutes(); s = timeVal.getSeconds();
-    } else {
-      var p = String(timeVal || "00:00:00").match(/(\d{1,2}):(\d{2}):(\d{2})/);
-      if (p) { h = parseInt(p[1]); mn = parseInt(p[2]); s = parseInt(p[3]); }
-    }
-  } catch(e) {}
-  d.setHours(h, mn, s, 0);
-  return d;
-}
-
-function getIncomingVans(branch) {
-  try {
-    var sheet = getSheet();
-    var values = getAllValues(sheet);
-    var now = new Date();
-    var vans = {};
-    for (var i = 1; i < values.length; i++) {
-      var dest = values[i][COL.DEST - 1];
-      var van = String(values[i][COL.VAN - 1] || "").trim();
-      var status = String(values[i][COL.STATUS - 1] || "").trim();
-      var origin = values[i][COL.ORIGIN - 1];
-      var dateStr = values[i][COL.DATE - 1];
-      var sendTime = values[i][COL.SEND_TIME - 1];
-      if (van && resolveMainBranch(dest) === branch && status === "In Transit") {
-        var key = van + "|" + origin;
-        if (!vans[key]) vans[key] = { vanNo: van, origin: origin, dateStr: dateStr, sendTime: sendTime, count: 0 };
-        vans[key].count++;
-      }
-    }
-    var result = [];
-    for (var key in vans) {
-      var v = vans[key];
-      var sentAt = parseDateTime(v.dateStr, v.sendTime);
-      var ms = now.getTime() - sentAt.getTime();
-      if (isNaN(ms) || ms < 0) ms = 0;
-      var min = Math.floor(ms / 60000);
-      var sec = Math.floor((ms % 60000) / 1000);
-      result.push({ vanNo: v.vanNo, origin: v.origin, count: v.count, elapsedMinutes: min, elapsedSeconds: sec, isLate: min >= 20 });
-    }
-    result.sort(function(a, b) { return (a.elapsedMinutes * 60 + a.elapsedSeconds) - (b.elapsedMinutes * 60 + b.elapsedSeconds); });
-    return result;
-  } catch(e) { return []; }
-}
-
-function handleSendBatch(data) {
-  try {
-    var sheet = getSheet();
-    var values = getAllValues(sheet);
-    var now = new Date();
-    var tz = CONFIG.TIMEZONE;
-    var dateStr = Utilities.formatDate(now, tz, "yyyy-MM-dd");
-    var timeStr = Utilities.formatDate(now, tz, "HH:mm:ss");
-
-    var inTransitIds = {};
-    for (var i = 1; i < values.length; i++) {
-      var sid = String(values[i][COL.ID - 1] || "").trim();
-      var status = String(values[i][COL.STATUS - 1] || "").trim();
-      if (sid && status === "In Transit") inTransitIds[sid] = values[i][COL.ORIGIN - 1];
-    }
-
-    var newRows = [], results = [];
-    var vanNo = String(data.vanNo || "").trim();
-    var origin = String(data.origin || "").toUpperCase().trim();
-    var dest = String(data.destination || "").toUpperCase().trim();
-    var shipments = data.shipments || [];
-    var driver = getDriverState(vanNo);
-    if (!vanNo || !driver.started || driver.status !== "AT_STATION" ||
-        resolveMainBranch(driver.branch) !== resolveMainBranch(origin)) {
-      return { success:false, error:"Select a van whose driver is checked in at " + origin };
-    }
-
-    for (var j = 0; j < shipments.length; j++) {
-      var sid2 = String(shipments[j].shipmentId || "").trim();
-      if (!sid2) continue;
-      if (inTransitIds[sid2]) {
-        results.push({ shipmentId: sid2, status: "duplicate", error: sid2 + " already In Transit from " + inTransitIds[sid2] });
-      } else {
-        newRows.push([dateStr, origin, dest, timeStr, sid2, vanNo, "In Transit", "", ""]);
-        results.push({ shipmentId: sid2, status: "sent" });
-        inTransitIds[sid2] = origin;
-      }
-    }
-
-    if (newRows.length > 0) {
-      var startRow = sheet.getLastRow() + 1;
-      var needed = startRow + newRows.length - 1;
-      if (sheet.getMaxRows() < needed) sheet.insertRowsAfter(sheet.getMaxRows(), needed - sheet.getMaxRows() + 5);
-      sheet.getRange(startRow, 1, newRows.length, CONFIG.TOTAL_COLS).setValues(newRows);
-    }
-    return { success: true, sent: newRows.length, results: results };
-  } catch (err) { return { success: false, error: err.toString() }; }
-}
-
-function handleReceiveBatch(data) {
-  try {
-    var sheet = getSheet();
-    var values = getAllValues(sheet);
-    var timeStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "HH:mm:ss");
-    var targetIds = {};
-    (data.shipmentIds || []).forEach(function(id) { targetIds[String(id).trim()] = true; });
-    var targetVan = String(data.vanNo).trim();
-    var branch = data.branch;
-    var receivedCount = 0, foundIds = {}, notFoundIds = [], modified = false;
-
-    for (var i = 1; i < values.length; i++) {
-      var sid = String(values[i][COL.ID - 1] || "").trim();
-      var dest = values[i][COL.DEST - 1];
-      var van = String(values[i][COL.VAN - 1] || "").trim();
-      var status = String(values[i][COL.STATUS - 1] || "").trim();
-      if (targetIds[sid] && resolveMainBranch(dest) === branch && van === targetVan && status === "In Transit" && !foundIds[sid]) {
-        values[i][COL.STATUS - 1] = "Received";
-        values[i][COL.RECV_BY - 1] = branch;
-        values[i][COL.RECV_TIME - 1] = timeStr;
-        receivedCount++; foundIds[sid] = true; modified = true;
-      }
-    }
-    if (modified) setAllValues(sheet, values);
-    (data.shipmentIds || []).forEach(function(id) {
-      var idStr = String(id).trim();
-      if (!foundIds[idStr]) notFoundIds.push(idStr);
-    });
-    return {
-      success: true,
-      message: receivedCount + " received" + (notFoundIds.length ? ", " + notFoundIds.length + " not found" : ""),
-      receivedCount: receivedCount, notFoundIds: notFoundIds
-    };
-  } catch (err) { return { success: false, error: err.toString() }; }
-}
-
-function handleReceiveOne(data) {
-  try {
-    var sheet = getSheet();
-    var values = getAllValues(sheet);
-    var timeStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "HH:mm:ss");
-    for (var i = 1; i < values.length; i++) {
-      var sid = String(values[i][COL.ID - 1] || "").trim();
-      var dest = values[i][COL.DEST - 1];
-      var van = String(values[i][COL.VAN - 1] || "").trim();
-      var status = String(values[i][COL.STATUS - 1] || "").trim();
-      if (sid === String(data.shipmentId || "").trim() && resolveMainBranch(dest) === data.branch &&
-          van === String(data.vanNo).trim() && status === "In Transit") {
-        values[i][COL.STATUS - 1] = "Received";
-        values[i][COL.RECV_BY - 1] = data.branch;
-        values[i][COL.RECV_TIME - 1] = timeStr;
-        setAllValues(sheet, values);
-        return { success: true, message: data.shipmentId + " received" };
-      }
-    }
-    return { success: false, error: "Not found or already received" };
-  } catch (err) { return { success: false, error: err.toString() }; }
-}
-
-function handleReceiveAll(data) {
-  try {
-    var sheet = getSheet();
-    var values = getAllValues(sheet);
-    var count = 0, modified = false;
-    var timeStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "HH:mm:ss");
-    for (var i = 1; i < values.length; i++) {
-      var dest = values[i][COL.DEST - 1];
-      var van = String(values[i][COL.VAN - 1] || "").trim();
-      var status = String(values[i][COL.STATUS - 1] || "").trim();
-      if (resolveMainBranch(dest) === data.branch && van === String(data.vanNo).trim() && status === "In Transit") {
-        values[i][COL.STATUS - 1] = "Received";
-        values[i][COL.RECV_BY - 1] = data.branch;
-        values[i][COL.RECV_TIME - 1] = timeStr;
-        count++; modified = true;
-      }
-    }
-    if (modified) setAllValues(sheet, values);
-    return { success: true, message: count + " shipment(s) received", count: count };
-  } catch (err) { return { success: false, error: err.toString() }; }
-}
-
-function getPendingByVan(branch, vanNo) {
-  var sheet = getSheet();
-  var values = getAllValues(sheet);
-  var result = [];
-  var targetVan = String(vanNo).trim();
-  for (var i = 1; i < values.length; i++) {
-    var rowDest = values[i][COL.DEST - 1];
-    var rowVan = String(values[i][COL.VAN - 1] || "").trim();
-    var rowStatus = String(values[i][COL.STATUS - 1] || "").trim();
-    if (resolveMainBranch(rowDest) === branch && rowVan === targetVan && rowStatus === "In Transit") {
-      result.push({ shipmentId: values[i][COL.ID - 1], origin: values[i][COL.ORIGIN - 1], destination: rowDest });
-    }
-  }
-  return result;
-}
-
-/* ═══════════════════════════════════════════════════════
    DRIVER SIDE — free-form check-in/out + round detection
    ONE sheet only (VAN MOVEMENTS) for speed.
 ═══════════════════════════════════════════════════════ */
@@ -379,13 +116,10 @@ function getMovementSheet() {
     sheet.getRange(2, MOVE_COL.ARRIVAL, sheet.getMaxRows() - 1, 2).setNumberFormat("yyyy-mm-dd hh:mm:ss");
     sheet.getRange(2, MOVE_COL.UPDATED, sheet.getMaxRows() - 1, 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
   } else if (sheet.getLastColumn() < MOVE_COL.UPDATED) {
-    // Upgrade an older-schema sheet in place, just in case.
     var headers = ["Date","Van No","Branch","Check In","Check Out","Hold Seconds","Hold Time",
       "Next Branch","Travel Seconds","Travel Time","Status","Round","Missed Branches","Last Updated"];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
-  // NOTE: number formats are only set when the sheet is first created.
-  // Setting formats on every call made even simple READS slow.
   return sheet;
 }
 
@@ -414,31 +148,24 @@ function movementRowsForToday(vanNo) {
   return rows;
 }
 
-// Walks today's rows for a van and figures out: what round are they on now,
-// and — for the round that just closed (if any) — which core branches got
-// visited vs missed. Skipping a branch is fine, it's just reported.
 function computeRoundInfo(priorRows, arrivingBranch) {
   var roundNumber = 1;
   var visitedThisRound = {};
-  var closedRound = null; // {round, missed[]} — only set if this check-in closes a round
-
+  var closedRound = null;
   for (var i = 0; i < priorRows.length; i++) {
     var b = String(priorRows[i].values[MOVE_COL.BRANCH - 1] || "").toUpperCase().trim();
     if (b === "TINKUNE") {
-      // A prior Tinkune row: if it's not the very first row, it closed a round.
       if (i > 0) roundNumber++;
       visitedThisRound = {};
     } else if (ROUND_CORE_BRANCHES.indexOf(b) !== -1) {
       visitedThisRound[b] = true;
     }
   }
-
   if (arrivingBranch === "TINKUNE" && priorRows.length > 0) {
     var missed = ROUND_CORE_BRANCHES.filter(function(b) { return !visitedThisRound[b]; });
     closedRound = { round: roundNumber, missed: missed };
-    roundNumber++; // the round now starting
+    roundNumber++;
   }
-
   return { roundNumber: roundNumber, closedRound: closedRound };
 }
 
@@ -510,9 +237,6 @@ function handleDriverCheckIn(data) {
     }
 
     if (state.status === "AT_STATION") {
-      // A retry can arrive after Google Sheets saved the original request
-      // but the phone lost the response. Treat the same check-in as success
-      // instead of rejecting it or creating another movement row.
       if (String(state.branch || "").toUpperCase().trim() === branch) {
         return { success:true, message:"Check-in already saved at " + state.branch,
           state:driverStateResponse(state) };
@@ -565,8 +289,6 @@ function handleDriverCheckOut(data) {
     var state = getDriverState(vanNo);
     if (!state.started) return { success:false, error:"Check in first" };
     if (state.status === "MOVING") {
-      // Idempotent retry: the phone may have timed out after this checkout
-      // was already written to the sheet.
       if (String(state.nextBranch || "").toUpperCase().trim() === nextBranch) {
         return { success:true, message:"Check-out already saved — heading to " + nextBranch,
           state:driverStateResponse(state) };
@@ -575,7 +297,7 @@ function handleDriverCheckOut(data) {
     }
     if (state.status !== "AT_STATION") return { success:false, error:"Van is not at a station" };
     var currentBranch = String(state.branch || "").toUpperCase().trim();
-    var allowedDestinations = DESTINATIONS[currentBranch] || DESTINATIONS[resolveMainBranch(currentBranch)] || [];
+    var allowedDestinations = DESTINATIONS[currentBranch] || [];
     if (allowedDestinations.indexOf(nextBranch) === -1) {
       return { success:false, error:"Choose a branch from the list" };
     }
@@ -599,8 +321,6 @@ function handleDriverCheckOut(data) {
   }
 }
 
-// FAST: single read of VAN MOVEMENTS, grouped by van in memory — used for
-// the company-wide monitor board. No per-van re-reads, no second sheet.
 function getVanBoard() {
   var dateStr = today();
   var cacheKey = 'van_board_raw_' + dateStr;
@@ -610,7 +330,6 @@ function getVanBoard() {
     try { rows = JSON.parse(cached); } catch (e) { rows = null; }
   }
   if (!rows) {
-    // ONE sheet read now serves every user for VAN_BOARD_TTL seconds.
     rows = [];
     var values = getMovementSheet().getDataRange().getValues();
     var latestByVan = {};
@@ -636,8 +355,6 @@ function getVanBoard() {
     }
     setCached_(cacheKey, JSON.stringify(rows), VAN_BOARD_TTL);
   }
-  // Elapsed time is computed HERE at response time, so cached data never
-  // makes the on-screen timers freeze — they stay accurate to the second.
   var nowMs = Date.now();
   return rows.map(function(item) {
     var out = { vanNo: item.vanNo, round: item.round };
@@ -695,11 +412,7 @@ function closeIssue(row) {
 
 /* ═══════════════════════════════════════════════════════
    ANNOUNCEMENTS & BRANCH CONTACTS — admin/branch panels
-   Both are CACHED like the van board (one read serves everyone)
-   and every write invalidates the cache instantly.
 ═══════════════════════════════════════════════════════ */
-
-const INFO_TTL = 60; // seconds
 
 function getAnnouncementSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -723,7 +436,6 @@ function getBranchContactSheet() {
   return sheet;
 }
 
-// One announcement per branch per day — posting again EDITS it.
 function handlePutAnnouncement(data) {
   var branch = String(data.branch || "").toUpperCase().trim();
   var message = String(data.message || "").trim();
@@ -763,7 +475,6 @@ function getAnnouncements() {
   return result;
 }
 
-// One contact row per branch — saving again EDITS it.
 function handleSaveBranchContact(data) {
   var branch = String(data.branch || "").toUpperCase().trim();
   var name = String(data.name || "").trim();
@@ -817,21 +528,12 @@ function doGet(e) {
     return jsonResponse(res);
   }
 
-  if (action === "getPendingByVan") {
-    return jsonResponse({ success: true, data: getPendingByVan(e.parameter.branch, e.parameter.vanNo) });
-  }
-  if (action === "getIncomingVans") {
-    return jsonResponse({ success: true, data: getIncomingVans(e.parameter.branch) });
-  }
   if (action === "getDriverState") {
     return jsonResponse({ success:true, state:driverStateResponse(getDriverState(e.parameter.vanNo)) });
   }
   if (action === "getDestinations") {
     var requestedBranch = String(e.parameter.branch || "").toUpperCase().trim();
-    // Driver-only stops must keep their own route options. Only shipment
-    // sub-branches should be resolved back to their main branch.
-    var branch = DESTINATIONS[requestedBranch] ? requestedBranch : resolveMainBranch(requestedBranch);
-    return jsonResponse({ success:true, destinations: DESTINATIONS[branch] || [], mainBranches: MAIN_BRANCHES });
+    return jsonResponse({ success:true, destinations: DESTINATIONS[requestedBranch] || [], mainBranches: MAIN_BRANCHES });
   }
   if (action === "getVanBoard") {
     return jsonResponse({ success:true, data:getVanBoard(), date:today() });
@@ -855,17 +557,13 @@ function doPost(e) {
   catch (err) { return jsonResponse({ success: false, error: "Bad JSON" }); }
 
   switch (body.action) {
-    case 'sendBatch':       return jsonResponse(handleSendBatch(body));
-    case 'receiveBatch':    return jsonResponse(handleReceiveBatch(body));
-    case 'receiveOne':      return jsonResponse(handleReceiveOne(body));
-    case 'receiveAll':      return jsonResponse(handleReceiveAll(body));
-    case 'driverCheckIn':   return jsonResponse(handleDriverCheckIn(body));
-    case 'driverCheckOut':  return jsonResponse(handleDriverCheckOut(body));
-    case 'submitIssue':     return jsonResponse(submitIssue(body));
+    case 'driverCheckIn':     return jsonResponse(handleDriverCheckIn(body));
+    case 'driverCheckOut':    return jsonResponse(handleDriverCheckOut(body));
+    case 'submitIssue':       return jsonResponse(submitIssue(body));
     case 'putAnnouncement':   return jsonResponse(handlePutAnnouncement(body));
     case 'saveBranchContact': return jsonResponse(handleSaveBranchContact(body));
-    case 'closeIssue':      return jsonResponse(closeIssue(body.row));
-    default:                return jsonResponse({ success: false, error: 'Unknown action' });
+    case 'closeIssue':        return jsonResponse(closeIssue(body.row));
+    default:                  return jsonResponse({ success: false, error: 'Unknown action' });
   }
 }
 
