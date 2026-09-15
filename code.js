@@ -1,14 +1,16 @@
 // ═══════════════════════════════════════════════════════
-//  NCM B2B TRACKER — BACKEND v9 (no shipments)
+//  NCM B2B TRACKER — BACKEND v10 (fast live board, no shipments)
 //  This version REMOVES the whole Send/Receive shipment
 //  system and the "SHIPMENT GPS" sheet. The app is now:
-//    • Driver check-in / check-out with round detection
+//    • Driver check-in / check-out with round detection + controlled edits
 //    • Live "All Vans" board
 //    • Branch announcements (post/edit, one per branch per day)
 //    • Branch contact persons (tappable to call)
 //    • Issue reporting
-//  Old sheet cleanup: you may delete the "SHIPMENT GPS"
-//  sheet from the spreadsheet — nothing reads it anymore.
+//  Storage is split for speed:
+//    • VAN MOVEMENTS = append/history and edits
+//    • VAN LIVE = one current row per van for live reads
+//  Old "SHIPMENT GPS" sheet is not used.
 //  Deploy → Manage deployments → Edit → New version → Deploy
 // ═══════════════════════════════════════════════════════
 
@@ -47,8 +49,8 @@ const MIN_TRAVEL_SECONDS = 120;
 const EXPECTED_LEG_MINUTES = 10;
 
 /* ═══ SMART POLLING CACHE ═══ */
-const DRIVER_STATE_TTL = 60;  // seconds
-const VAN_BOARD_TTL = 30;     // seconds
+const DRIVER_STATE_TTL = 5;   // seconds; elapsed time is calculated on read
+const VAN_BOARD_TTL = 8;      // seconds; VAN LIVE contains one row per van
 const INFO_TTL = 60;          // seconds
 
 function getCached_(key) {
@@ -61,7 +63,8 @@ function removeCached_(key) {
   try { CacheService.getScriptCache().remove(key); } catch (e) {}
 }
 function invalidateDriverCaches(vanNo) {
-  removeCached_('drv_state_' + String(vanNo || '').trim());
+  var key = String(vanNo || '').trim();
+  removeCached_('drv_state_' + key);
   removeCached_('van_board_raw_' + today());
 }
 
@@ -102,6 +105,14 @@ const MOVE_COL = {
   STATUS:11, ROUND:12, MISSED:13, UPDATED:14
 };
 
+// VAN MOVEMENTS is the append/history sheet. VAN LIVE is the tiny current-state
+// index: one row per van, used by every read-only board request.
+const LIVE_COL = {
+  DATE:1, VAN:2, BRANCH:3, ARRIVAL:4, DEPARTURE:5,
+  HOLD_SECONDS:6, HOLD_TIME:7, NEXT_BRANCH:8, TRAVEL_SECONDS:9, TRAVEL_TIME:10,
+  STATUS:11, ROUND:12, MISSED:13, UPDATED:14, SOURCE_ROW:15
+};
+
 function getMovementSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("VAN MOVEMENTS");
@@ -121,6 +132,124 @@ function getMovementSheet() {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   return sheet;
+}
+
+function getLiveSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("VAN LIVE");
+  if (!sheet) {
+    sheet = ss.insertSheet("VAN LIVE");
+    sheet.appendRow([
+      "Date","Van No","Branch","Check In","Check Out","Hold Seconds","Hold Time",
+      "Next Branch","Travel Seconds","Travel Time","Status","Round","Missed Branches",
+      "Last Updated","Source Movement Row"
+    ]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(2, LIVE_COL.VAN, Math.max(1, sheet.getMaxRows() - 1), 1).setNumberFormat('@');
+    sheet.getRange(2, LIVE_COL.ARRIVAL, Math.max(1, sheet.getMaxRows() - 1), 2).setNumberFormat("yyyy-mm-dd hh:mm:ss");
+    sheet.getRange(2, LIVE_COL.UPDATED, Math.max(1, sheet.getMaxRows() - 1), 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
+  } else if (sheet.getLastColumn() < LIVE_COL.SOURCE_ROW) {
+    sheet.getRange(1, 1, 1, LIVE_COL.SOURCE_ROW).setValues([[
+      "Date","Van No","Branch","Check In","Check Out","Hold Seconds","Hold Time",
+      "Next Branch","Travel Seconds","Travel Time","Status","Round","Missed Branches",
+      "Last Updated","Source Movement Row"
+    ]]);
+  }
+  return sheet;
+}
+
+function liveRowNumber_(vanNo) {
+  var key = String(vanNo || "").trim();
+  if (!key) return 0;
+  var cacheKey = 'live_row_' + key;
+  var cached = getCached_(cacheKey);
+  if (cached && Number(cached) > 1) {
+    var cachedRow = Number(cached);
+    var cachedSheet = getLiveSheet();
+    if (cachedRow <= cachedSheet.getLastRow() &&
+        String(cachedSheet.getRange(cachedRow, LIVE_COL.VAN).getDisplayValue()).trim() === key) {
+      return cachedRow;
+    }
+  }
+  var sheet = getLiveSheet();
+  var last = sheet.getLastRow();
+  if (last < 2) return 0;
+  var values = sheet.getRange(2, LIVE_COL.VAN, last - 1, 1).getDisplayValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0]).trim() === key) {
+      setCached_(cacheKey, String(i + 2), 300);
+      return i + 2;
+    }
+  }
+  return 0;
+}
+
+function movementValuesFromLive_(row) {
+  var values = row.slice(0, MOVE_COL.UPDATED);
+  return values;
+}
+
+function syncLiveRow_(vanNo, movementValues, sourceRow) {
+  var sheet = getLiveSheet();
+  var key = String(vanNo || movementValues[MOVE_COL.VAN - 1] || "").trim();
+  var liveValues = movementValuesFromLive_(movementValues);
+  liveValues.push(Number(sourceRow) || 0);
+  var row = liveRowNumber_(key);
+  if (!row) {
+    row = Math.max(2, sheet.getLastRow() + 1);
+    sheet.getRange(row, 1, 1, LIVE_COL.SOURCE_ROW).setValues([liveValues]);
+  } else {
+    sheet.getRange(row, 1, 1, LIVE_COL.SOURCE_ROW).setValues([liveValues]);
+  }
+  setCached_('live_row_' + key, String(row), 300);
+  return row;
+}
+
+function liveRowValues_(vanNo) {
+  var row = liveRowNumber_(vanNo);
+  if (!row) return null;
+  return getLiveSheet().getRange(row, 1, 1, LIVE_COL.SOURCE_ROW).getValues()[0];
+}
+
+function ensureLiveSheetToday_() {
+  var dateStr = today();
+  var marker = 'live_ready_' + dateStr;
+  if (getCached_(marker)) return;
+  var migrationLock = LockService.getScriptLock();
+  if (!migrationLock.tryLock(1000)) return;
+  try {
+    if (getCached_(marker)) return;
+  var liveSheet = getLiveSheet();
+  var hasToday = false;
+  var liveLast = liveSheet.getLastRow();
+  if (liveLast >= 2) {
+    var liveDates = liveSheet.getRange(2, LIVE_COL.DATE, liveLast - 1, 1).getValues();
+    for (var i = 0; i < liveDates.length; i++) {
+      if (normalizeDateStr(liveDates[i][0]) === dateStr) {
+        hasToday = true;
+        break;
+      }
+    }
+  }
+  if (!hasToday) {
+    var values = getMovementSheet().getDataRange().getValues();
+    var latestByVan = {};
+    for (var j = 1; j < values.length; j++) {
+      var row = values[j];
+      var van = String(row[MOVE_COL.VAN - 1] || '').trim();
+      if (van && normalizeDateStr(row[MOVE_COL.DATE - 1]) === dateStr) {
+        latestByVan[van] = { values: row, rowIndex: j + 1 };
+      }
+    }
+    Object.keys(latestByVan).forEach(function(vanNo) {
+      var item = latestByVan[vanNo];
+      syncLiveRow_(vanNo, item.values, item.rowIndex);
+    });
+  }
+  setCached_(marker, '1', 300);
+  } finally {
+    migrationLock.releaseLock();
+  }
 }
 
 function getIssueSheet() {
@@ -176,27 +305,48 @@ function getDriverState(vanNo) {
   if (cached) {
     try { return JSON.parse(cached); } catch (e) {}
   }
-  var rows = movementRowsForToday(vanNo);
   var state;
-  if (!rows.length) {
-    state = { vanNo: vanKey, started: false, branch: null, nextBranch: null, status: "NOT_STARTED", round: 0 };
-  } else {
-    var item = rows[rows.length - 1];
-    var v = item.values;
+  var live = liveRowValues_(vanKey);
+  if (live && normalizeDateStr(live[LIVE_COL.DATE - 1]) === today()) {
     state = {
-      vanNo: String(v[MOVE_COL.VAN - 1]).trim(),
+      vanNo: String(live[LIVE_COL.VAN - 1]).trim(),
       started: true,
-      branch: v[MOVE_COL.BRANCH - 1],
-      nextBranch: v[MOVE_COL.NEXT_BRANCH - 1] || null,
-      arrivalTime: v[MOVE_COL.ARRIVAL - 1] || null,
-      departureTime: v[MOVE_COL.DEPARTURE - 1] || null,
-      holdSeconds: Number(v[MOVE_COL.HOLD_SECONDS - 1]) || 0,
-      travelSeconds: Number(v[MOVE_COL.TRAVEL_SECONDS - 1]) || 0,
-      status: String(v[MOVE_COL.STATUS - 1] || "AT_STATION"),
-      round: Number(v[MOVE_COL.ROUND - 1]) || 1,
-      lastMissed: v[MOVE_COL.MISSED - 1] || "",
-      rowIndex: item.rowIndex
+      branch: live[LIVE_COL.BRANCH - 1],
+      nextBranch: live[LIVE_COL.NEXT_BRANCH - 1] || null,
+      arrivalTime: live[LIVE_COL.ARRIVAL - 1] || null,
+      departureTime: live[LIVE_COL.DEPARTURE - 1] || null,
+      holdSeconds: Number(live[LIVE_COL.HOLD_SECONDS - 1]) || 0,
+      travelSeconds: Number(live[LIVE_COL.TRAVEL_SECONDS - 1]) || 0,
+      status: String(live[LIVE_COL.STATUS - 1] || "AT_STATION"),
+      round: Number(live[LIVE_COL.ROUND - 1]) || 1,
+      lastMissed: live[LIVE_COL.MISSED - 1] || "",
+      rowIndex: Number(live[LIVE_COL.SOURCE_ROW - 1]) || 0
     };
+  } else {
+    // One-time compatibility fallback for movement history created before
+    // VAN LIVE existed. The next write automatically seeds the live row.
+    var rows = movementRowsForToday(vanNo);
+    if (!rows.length) {
+      state = { vanNo: vanKey, started: false, branch: null, nextBranch: null, status: "NOT_STARTED", round: 0 };
+    } else {
+      var item = rows[rows.length - 1];
+      var v = item.values;
+      state = {
+        vanNo: String(v[MOVE_COL.VAN - 1]).trim(),
+        started: true,
+        branch: v[MOVE_COL.BRANCH - 1],
+        nextBranch: v[MOVE_COL.NEXT_BRANCH - 1] || null,
+        arrivalTime: v[MOVE_COL.ARRIVAL - 1] || null,
+        departureTime: v[MOVE_COL.DEPARTURE - 1] || null,
+        holdSeconds: Number(v[MOVE_COL.HOLD_SECONDS - 1]) || 0,
+        travelSeconds: Number(v[MOVE_COL.TRAVEL_SECONDS - 1]) || 0,
+        status: String(v[MOVE_COL.STATUS - 1] || "AT_STATION"),
+        round: Number(v[MOVE_COL.ROUND - 1]) || 1,
+        lastMissed: v[MOVE_COL.MISSED - 1] || "",
+        rowIndex: item.rowIndex
+      };
+      syncLiveRow_(vanKey, v, item.rowIndex);
+    }
   }
   setCached_(cacheKey, JSON.stringify(state), DRIVER_STATE_TTL);
   return state;
@@ -211,7 +361,8 @@ function driverStateResponse(state) {
     vanNo: state.vanNo, started: state.started, branch: state.branch,
     nextBranch: state.nextBranch, status: state.status, elapsedSeconds: elapsed,
     holdSeconds: state.holdSeconds || 0, travelSeconds: state.travelSeconds || 0,
-    round: state.round || 1, lastMissed: state.lastMissed || ""
+    round: state.round || 1, lastMissed: state.lastMissed || "",
+    arrivalTime: state.arrivalTime || null, departureTime: state.departureTime || null
   };
 }
 
@@ -232,6 +383,8 @@ function handleDriverCheckIn(data) {
     if (!state.started) {
       var info0 = computeRoundInfo([], branch);
       sheet.appendRow([today(), vanNo, branch, now, "", 0, "", "", 0, "", "AT_STATION", info0.roundNumber, "", now]);
+      var firstRow = sheet.getLastRow();
+      syncLiveRow_(vanNo, sheet.getRange(firstRow, 1, 1, MOVE_COL.UPDATED).getValues()[0], firstRow);
       invalidateDriverCaches(vanNo);
       return { success:true, message:"Checked in at " + branch, state:driverStateResponse(getDriverState(vanNo)) };
     }
@@ -264,6 +417,8 @@ function handleDriverCheckIn(data) {
     var info = computeRoundInfo(priorRows, branch);
     var missedStr = info.closedRound ? (info.closedRound.missed.length ? info.closedRound.missed.join(", ") : "None") : "";
     sheet.appendRow([today(), vanNo, branch, now, "", 0, "", "", 0, "", "AT_STATION", info.roundNumber, missedStr, now]);
+    var newRow = sheet.getLastRow();
+    syncLiveRow_(vanNo, sheet.getRange(newRow, 1, 1, MOVE_COL.UPDATED).getValues()[0], newRow);
     invalidateDriverCaches(vanNo);
 
     var msg = "Checked in at " + branch;
@@ -313,6 +468,7 @@ function handleDriverCheckOut(data) {
     values[MOVE_COL.STATUS - 1] = "MOVING";
     values[MOVE_COL.UPDATED - 1] = now;
     sheet.getRange(state.rowIndex, 1, 1, values.length).setValues([values]);
+    syncLiveRow_(vanNo, values, state.rowIndex);
     invalidateDriverCaches(vanNo);
 
     return { success:true, message:"Checked out — heading to " + nextBranch, state:driverStateResponse(getDriverState(vanNo)) };
@@ -321,7 +477,90 @@ function handleDriverCheckOut(data) {
   }
 }
 
+function parseEditDate_(value) {
+  var d = value instanceof Date ? value : new Date(String(value || ""));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function handleEditDriverMovement(data) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var vanNo = String(data.vanNo || "").trim();
+    var editType = String(data.editType || "").trim();
+    var state = getDriverState(vanNo);
+    if (!vanNo || !state.started || !state.rowIndex) {
+      return { success:false, error:"No editable movement found for this van" };
+    }
+    if (editType !== "checkIn" && editType !== "checkOut") {
+      return { success:false, error:"Choose check-in or check-out" };
+    }
+    var editedTime = parseEditDate_(data.timestamp);
+    if (!editedTime) return { success:false, error:"Invalid movement time" };
+    var sheet = getMovementSheet();
+    if (state.rowIndex < 2 || state.rowIndex > sheet.getLastRow()) {
+      return { success:false, error:"Movement row is no longer available" };
+    }
+    var values = sheet.getRange(state.rowIndex, 1, 1, MOVE_COL.UPDATED).getValues()[0];
+    if (String(values[MOVE_COL.VAN - 1]).trim() !== vanNo) {
+      return { success:false, error:"Van movement changed. Refresh and try again." };
+    }
+
+    if (editType === "checkIn") {
+      var branch = String(data.branch || "").toUpperCase().trim();
+      if (!DESTINATIONS[branch]) return { success:false, error:"Choose a valid check-in branch" };
+      var departure = values[MOVE_COL.DEPARTURE - 1];
+      if (departure instanceof Date && editedTime.getTime() > departure.getTime()) {
+        return { success:false, error:"Check-in must be before check-out" };
+      }
+      if (String(values[MOVE_COL.STATUS - 1] || "") === "MOVING") {
+        var next = String(values[MOVE_COL.NEXT_BRANCH - 1] || "").toUpperCase().trim();
+        if ((DESTINATIONS[branch] || []).indexOf(next) === -1) {
+          return { success:false, error:"That branch cannot use the current next destination" };
+        }
+      }
+      values[MOVE_COL.BRANCH - 1] = branch;
+      values[MOVE_COL.ARRIVAL - 1] = editedTime;
+      if (departure instanceof Date) {
+        var travel = secondsBetween(editedTime, departure);
+        values[MOVE_COL.TRAVEL_SECONDS - 1] = travel;
+        values[MOVE_COL.TRAVEL_TIME - 1] = timeLabel(travel);
+      }
+    } else {
+      if (String(values[MOVE_COL.STATUS - 1] || "") !== "MOVING") {
+        return { success:false, error:"Check out is available after a van starts moving" };
+      }
+      var nextBranch = String(data.nextBranch || "").toUpperCase().trim();
+      var currentBranch = String(values[MOVE_COL.BRANCH - 1] || "").toUpperCase().trim();
+      if ((DESTINATIONS[currentBranch] || []).indexOf(nextBranch) === -1) {
+        return { success:false, error:"Choose a valid next branch" };
+      }
+      var arrival = values[MOVE_COL.ARRIVAL - 1];
+      if (arrival instanceof Date && editedTime.getTime() < arrival.getTime()) {
+        return { success:false, error:"Check-out must be after check-in" };
+      }
+      var hold = secondsBetween(arrival, editedTime);
+      values[MOVE_COL.DEPARTURE - 1] = editedTime;
+      values[MOVE_COL.HOLD_SECONDS - 1] = hold;
+      values[MOVE_COL.HOLD_TIME - 1] = timeLabel(hold);
+      values[MOVE_COL.NEXT_BRANCH - 1] = nextBranch;
+    }
+    values[MOVE_COL.UPDATED - 1] = new Date();
+    sheet.getRange(state.rowIndex, 1, 1, values.length).setValues([values]);
+    syncLiveRow_(vanNo, values, state.rowIndex);
+    invalidateDriverCaches(vanNo);
+    return {
+      success:true,
+      message: editType === "checkIn" ? "Check-in updated" : "Check-out updated",
+      state: driverStateResponse(getDriverState(vanNo))
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function getVanBoard() {
+  ensureLiveSheetToday_();
   var dateStr = today();
   var cacheKey = 'van_board_raw_' + dateStr;
   var rows = null;
@@ -331,26 +570,22 @@ function getVanBoard() {
   }
   if (!rows) {
     rows = [];
-    var values = getMovementSheet().getDataRange().getValues();
-    var latestByVan = {};
-    for (var i = 1; i < values.length; i++) {
-      var van = String(values[i][MOVE_COL.VAN - 1] || "").trim();
+    var sheet = getLiveSheet();
+    var last = sheet.getLastRow();
+    var values = last >= 2 ? sheet.getRange(2, 1, last - 1, LIVE_COL.SOURCE_ROW).getValues() : [];
+    for (var i = 0; i < values.length; i++) {
+      var v = values[i];
+      var van = String(v[LIVE_COL.VAN - 1] || "").trim();
       if (!van) continue;
-      if (normalizeDateStr(values[i][MOVE_COL.DATE - 1]) !== dateStr) continue;
-      latestByVan[van] = values[i];
-    }
-    for (var vanNo in latestByVan) {
-      var v = latestByVan[vanNo];
-      var arr = v[MOVE_COL.ARRIVAL - 1];
-      var dep = v[MOVE_COL.DEPARTURE - 1];
+      if (normalizeDateStr(v[LIVE_COL.DATE - 1]) !== dateStr) continue;
       rows.push({
-        vanNo: vanNo,
-        status: String(v[MOVE_COL.STATUS - 1] || ""),
-        branch: v[MOVE_COL.BRANCH - 1],
-        nextBranch: v[MOVE_COL.NEXT_BRANCH - 1],
-        round: Number(v[MOVE_COL.ROUND - 1]) || 1,
-        arrivalMs: arr instanceof Date ? arr.getTime() : 0,
-        departureMs: dep instanceof Date ? dep.getTime() : 0
+        vanNo: van,
+        status: String(v[LIVE_COL.STATUS - 1] || ""),
+        branch: v[LIVE_COL.BRANCH - 1],
+        nextBranch: v[LIVE_COL.NEXT_BRANCH - 1],
+        round: Number(v[LIVE_COL.ROUND - 1]) || 1,
+        arrivalMs: v[LIVE_COL.ARRIVAL - 1] instanceof Date ? v[LIVE_COL.ARRIVAL - 1].getTime() : 0,
+        departureMs: v[LIVE_COL.DEPARTURE - 1] instanceof Date ? v[LIVE_COL.DEPARTURE - 1].getTime() : 0
       });
     }
     setCached_(cacheKey, JSON.stringify(rows), VAN_BOARD_TTL);
@@ -375,6 +610,46 @@ function getVanBoard() {
     if (a.status === 'moving' && b.status !== 'moving') return -1;
     if (a.status !== 'moving' && b.status === 'moving') return 1;
     return 0;
+  });
+}
+
+function getLiveVans(vanList) {
+  ensureLiveSheetToday_();
+  var requested = String(vanList || "").split(",").map(function(v) {
+    return v.trim();
+  }).filter(Boolean).slice(0, 5);
+  if (!requested.length) return getVanBoard();
+  var dateStr = today();
+  var rows = [];
+  requested.forEach(function(vanNo) {
+    var v = liveRowValues_(vanNo);
+    if (!v || normalizeDateStr(v[LIVE_COL.DATE - 1]) !== dateStr) return;
+    rows.push({
+      vanNo: String(v[LIVE_COL.VAN - 1]).trim(),
+      status: String(v[LIVE_COL.STATUS - 1] || ""),
+      branch: v[LIVE_COL.BRANCH - 1],
+      nextBranch: v[LIVE_COL.NEXT_BRANCH - 1],
+      round: Number(v[LIVE_COL.ROUND - 1]) || 1,
+      arrivalMs: v[LIVE_COL.ARRIVAL - 1] instanceof Date ? v[LIVE_COL.ARRIVAL - 1].getTime() : 0,
+      departureMs: v[LIVE_COL.DEPARTURE - 1] instanceof Date ? v[LIVE_COL.DEPARTURE - 1].getTime() : 0
+    });
+  });
+  var nowMs = Date.now();
+  return rows.map(function(item) {
+    var out = { vanNo: item.vanNo, round: item.round };
+    if (item.status === "MOVING") {
+      var elapsed = Math.max(0, Math.floor((nowMs - item.departureMs) / 1000));
+      out.status = "moving";
+      out.fromBranch = item.branch;
+      out.toBranch = item.nextBranch;
+      out.elapsedSeconds = elapsed;
+      out.isLate = Math.floor(elapsed / 60) >= EXPECTED_LEG_MINUTES;
+    } else {
+      out.status = "at_branch";
+      out.branch = item.branch;
+      out.elapsedSeconds = Math.max(0, Math.floor((nowMs - item.arrivalMs) / 1000));
+    }
+    return out;
   });
 }
 
@@ -538,6 +813,9 @@ function doGet(e) {
   if (action === "getVanBoard") {
     return jsonResponse({ success:true, data:getVanBoard(), date:today() });
   }
+  if (action === "getLiveVans") {
+    return jsonResponse({ success:true, data:getLiveVans(e.parameter.vans), date:today() });
+  }
   if (action === "getIssues") {
     return jsonResponse({ success:true, data:getIssues(false) });
   }
@@ -559,6 +837,7 @@ function doPost(e) {
   switch (body.action) {
     case 'driverCheckIn':     return jsonResponse(handleDriverCheckIn(body));
     case 'driverCheckOut':    return jsonResponse(handleDriverCheckOut(body));
+    case 'editDriverMovement':return jsonResponse(handleEditDriverMovement(body));
     case 'submitIssue':       return jsonResponse(submitIssue(body));
     case 'putAnnouncement':   return jsonResponse(handlePutAnnouncement(body));
     case 'saveBranchContact': return jsonResponse(handleSaveBranchContact(body));
