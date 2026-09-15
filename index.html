@@ -74,8 +74,14 @@ input:focus,select:focus{outline:none;border-color:#dc2626}
 .route-server-status.ok{color:#15803d}
 .route-server-status.pending{color:#a16207;font-weight:700}
 .issue-box textarea{width:100%;min-height:65px;resize:vertical;padding:11px;font:14px inherit;border:1.5px solid #e2e8f0;border-radius:8px}
+.edit-actions{display:flex;gap:6px;margin-top:9px}
+.edit-actions .btn{flex:1;font-size:11px;padding:9px 5px;text-transform:none}
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.48);display:flex;align-items:flex-end;justify-content:center;padding:14px;z-index:2000}
+.edit-modal{width:100%;max-width:520px;background:#fff;border-radius:14px;padding:16px;box-shadow:0 12px 35px rgba(15,23,42,.25)}
+.edit-modal h3{font-size:16px;margin-bottom:12px}
+.edit-modal .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.edit-modal input,.edit-modal select{font-size:14px}
 </style>
-<base target="_blank">
 <base target="_blank">
 </head>
 <body>
@@ -152,7 +158,6 @@ input:focus,select:focus{outline:none;border-color:#dc2626}
         <div class="card hidden" id="driverCard">
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
             <h4 style="flex:1;margin:0">📍 Check In / Check Out <span class="round-badge" id="roundBadge">Round 1</span></h4>
-            <button class="btn btn-grey btn-small" onclick="editVanNo()">✏️ Edit</button>
           </div>
           <p style="font-size:12px;color:#64748b;margin-bottom:6px">Van <b id="driverVanLabel">-</b></p>
 
@@ -171,6 +176,10 @@ input:focus,select:focus{outline:none;border-color:#dc2626}
               <button class="btn btn-outline-red" id="driverCheckOutBtn" onclick="driverCheckOutStart()" disabled>CHECK OUT</button>
             </div>
             <div id="driverServerStatus" class="route-server-status" aria-live="polite"></div>
+            <div class="edit-actions">
+              <button class="btn btn-grey" id="editCheckInBtn" onclick="openMovementEditor('checkIn')">✏️ Edit check-in</button>
+              <button class="btn btn-grey" id="editCheckOutBtn" onclick="openMovementEditor('checkOut')">✏️ Edit check-out</button>
+            </div>
           </div>
         </div>
 
@@ -231,6 +240,28 @@ input:focus,select:focus{outline:none;border-color:#dc2626}
   </div>
 </div>
 
+<div id="movementEditBackdrop" class="modal-backdrop hidden" onclick="if(event.target===this)closeMovementEditor()">
+  <div class="edit-modal" role="dialog" aria-modal="true" aria-labelledby="movementEditTitle">
+    <h3 id="movementEditTitle">Edit check-in</h3>
+    <div id="editCheckInFields">
+      <label>Check-in branch</label>
+      <select id="editCheckInBranch"></select>
+      <label class="mt-10">Check-in time</label>
+      <input type="datetime-local" id="editCheckInTime">
+    </div>
+    <div id="editCheckOutFields" class="hidden">
+      <label>Next branch</label>
+      <select id="editCheckOutBranch"></select>
+      <label class="mt-10">Check-out time</label>
+      <input type="datetime-local" id="editCheckOutTime">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-grey" onclick="closeMovementEditor()">Cancel</button>
+      <button class="btn btn-blue" id="saveMovementEditBtn" onclick="saveMovementEdit()">Save edit</button>
+    </div>
+  </div>
+</div>
+
 <div class="status-bar hidden" id="statusBar">
   <span>Branch: <span class="branch" id="userBranch">-</span><span id="roleBadge"></span></span>
   <button class="btn btn-grey btn-small" onclick="logout()">Logout</button>
@@ -238,14 +269,20 @@ input:focus,select:focus{outline:none;border-color:#dc2626}
 <div class="build-tag" id="buildTag"></div>
 
 <script>
-const APP_VERSION = "v23-no-shipments";
+const APP_VERSION = "v24-fast-live";
 let SCRIPT_URL = localStorage.getItem('ncm_url') || "";
 let currentBranch = "";
 let currentRole = "";
 let currentDestinations = [];
 let vanBoardPollInterval = null;
-const DRIVER_POLL_MS = 15000;
-const VAN_BOARD_POLL_MS = 60000;
+let vanBoardSnapshotAt = 0;
+let vanBoardInFlight = false;
+let vanBoardLoaded = false;
+let vanBoardData = [];
+let trackedVanNos = [];
+const DRIVER_POLL_MS = 5000;
+const VAN_BOARD_POLL_MS = 15000;
+const VAN_BOARD_SNAPSHOT_MS = 60000;
 const OUTBOX_FLUSH_MS = 10000;
 
 // Driver state
@@ -265,6 +302,8 @@ const DRIVER_OUTBOX_KEY = 'ncm_driver_outbox_v1';
 const DRIVER_STATE_CACHE_KEY = 'ncm_driver_state_cache_v1';
 let driverOutbox = loadDriverOutbox();
 let driverSyncInFlight = false;
+let driverStateInFlight = false;
+let movementEditType = '';
 
 function loadDriverOutbox() {
   try {
@@ -534,6 +573,7 @@ function showApp() {
     });
     loadAnnouncements();
     loadContacts();
+    startVanBoardPolling();
   } else {
     document.getElementById('userBranch').innerText = currentBranch;
     document.getElementById('roleBadge').className = '';
@@ -548,12 +588,11 @@ function showApp() {
     loadAnnouncements();
     loadContacts();
   }
-  startVanBoardPolling();
 }
 
-function showTab(tab) {
+function showTab(tab, evt) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  if (event && event.target) event.target.classList.add('active');
+  if (evt && evt.target) evt.target.classList.add('active');
   else document.getElementById(tab === 'vans' ? 'allVansNavTab' : tab === 'second' ? 'secondNavTab' : 'mainNavTab').classList.add('active');
 
   document.getElementById('mainTab').classList.toggle('hidden', tab !== 'main');
@@ -561,7 +600,7 @@ function showTab(tab) {
   document.getElementById('vansTab').classList.toggle('hidden', tab !== 'vans');
 
   if (tab === 'second') loadContacts();
-  if (tab === 'vans') loadVanBoard();
+  if (tab === 'vans') startVanBoardPolling();
 }
 
 function logout() {
@@ -573,23 +612,54 @@ function logout() {
 /* ===================== ALL VANS — company board ===================== */
 
 function startVanBoardPolling() {
-  loadVanBoard();
   if (vanBoardPollInterval) clearInterval(vanBoardPollInterval);
+  loadVanBoard();
   vanBoardPollInterval = setInterval(() => {
     if (document.hidden) return;
-    loadVanBoard();
-    refreshInfoPanels();
+    if (!vanBoardLoaded || Date.now() - vanBoardSnapshotAt >= VAN_BOARD_SNAPSHOT_MS) {
+      loadVanBoard();
+    } else {
+      pollTrackedLiveVans();
+    }
   }, VAN_BOARD_POLL_MS);
 }
 
 async function loadVanBoard() {
+  if (vanBoardInFlight) return;
+  vanBoardInFlight = true;
   try {
     const res = await apiGet({ action: 'getVanBoard' });
     if (!res.success) return;
     const vans = res.data || [];
+    vanBoardData = vans;
+    vanBoardLoaded = true;
+    vanBoardSnapshotAt = Date.now();
+    trackedVanNos = [driverVanNo].concat(vans.map(v => String(v.vanNo))).filter(Boolean)
+      .filter((v, i, a) => a.indexOf(v) === i).slice(0, 5);
     renderVanBoard(vans, 'vanBoardList');
     renderVanBoard(vans, 'adminVanBoardList');
-  } catch(e) {}
+  } catch(e) {} finally {
+    vanBoardInFlight = false;
+  }
+}
+
+async function pollTrackedLiveVans() {
+  const vans = trackedVanNos.filter(Boolean).slice(0, 5);
+  if (!vans.length || vanBoardInFlight) return;
+  vanBoardInFlight = true;
+  try {
+    const res = await apiGet({ action: 'getLiveVans', vans: vans.join(',') });
+    if (!res.success) return;
+    const current = res.data || [];
+    const byVan = {};
+    vanBoardData.forEach(v => { byVan[String(v.vanNo)] = v; });
+    current.forEach(v => { byVan[String(v.vanNo)] = v; });
+    vanBoardData = Object.keys(byVan).map(k => byVan[k]);
+    renderVanBoard(vanBoardData, 'vanBoardList');
+    renderVanBoard(vanBoardData, 'adminVanBoardList');
+  } catch(e) {} finally {
+    vanBoardInFlight = false;
+  }
 }
 
 function renderVanBoard(vans, listId) {
@@ -664,6 +734,7 @@ function startDriverPolling() {
 
 async function loadDriverState() {
   if (!driverVanNo) return false;
+  if (driverStateInFlight) return false;
   if (pendingDriverOperations().length) {
     applyPendingDriverState();
     renderDriverState();
@@ -671,6 +742,7 @@ async function loadDriverState() {
     flushDriverOutbox();
     return true;
   }
+  driverStateInFlight = true;
   try {
     const res = await apiGet({ action: 'getDriverState', vanNo: driverVanNo });
     if (res && res.success && res.state) {
@@ -684,6 +756,8 @@ async function loadDriverState() {
     }
   } catch(e) {
     setDriverServerStatus('Cannot read status from Apps Script.', 'bad');
+  } finally {
+    driverStateInFlight = false;
   }
   return false;
 }
@@ -755,16 +829,22 @@ function renderDriverState() {
   const timer = document.getElementById('driverTimer');
   const timerLabel = document.getElementById('driverTimerLabel');
   const roundBadge = document.getElementById('roundBadge');
+  const editInBtn = document.getElementById('editCheckInBtn');
+  const editOutBtn = document.getElementById('editCheckOutBtn');
 
   roundBadge.textContent = 'Round ' + (driverState && driverState.round ? driverState.round : 1);
 
   if (!driverState || !driverState.started) {
+    if (editInBtn) editInBtn.classList.add('hidden');
+    if (editOutBtn) editOutBtn.classList.add('hidden');
     box.classList.add('hidden');
     if (!pickingNextBranch) renderInitialBranchPick();
     return;
   }
 
   const status = normalizedDriverStatus(driverState);
+  if (editInBtn) editInBtn.classList.remove('hidden');
+  if (editOutBtn) editOutBtn.classList.toggle('hidden', status !== 'MOVING');
 
   if (status === 'AT_STATION') {
     if (pickingNextBranch) {
@@ -824,6 +904,74 @@ function fmtSeconds(total) {
   return (h ? String(h).padStart(2,'0') + ':' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
 }
 
+function toDateTimeLocal(value) {
+  const d = value ? new Date(value) : new Date();
+  if (isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+    'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function fillSelect(id, values, selected) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = values.map(v => '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>').join('');
+  if (selected) el.value = selected;
+}
+
+function openMovementEditor(type) {
+  if (!driverState || !driverState.started) return;
+  movementEditType = type;
+  const isIn = type === 'checkIn';
+  document.getElementById('movementEditTitle').textContent = isIn ? 'Edit check-in' : 'Edit check-out';
+  document.getElementById('editCheckInFields').classList.toggle('hidden', !isIn);
+  document.getElementById('editCheckOutFields').classList.toggle('hidden', isIn);
+  if (isIn) {
+    fillSelect('editCheckInBranch', mainBranches, driverState.branch);
+    document.getElementById('editCheckInTime').value = toDateTimeLocal(driverState.arrivalTime);
+  } else {
+    const destinations = DRIVER_BRANCH_DESTINATIONS[String(driverState.branch || '').toUpperCase()] || mainBranches;
+    fillSelect('editCheckOutBranch', destinations, driverState.nextBranch);
+    document.getElementById('editCheckOutTime').value = toDateTimeLocal(driverState.departureTime);
+  }
+  document.getElementById('movementEditBackdrop').classList.remove('hidden');
+}
+
+function closeMovementEditor() {
+  movementEditType = '';
+  document.getElementById('movementEditBackdrop').classList.add('hidden');
+}
+
+async function saveMovementEdit() {
+  if (!movementEditType || !driverState) return;
+  const isIn = movementEditType === 'checkIn';
+  const rawTime = document.getElementById(isIn ? 'editCheckInTime' : 'editCheckOutTime').value;
+  if (!rawTime) return toast('Choose a time', 'bad');
+  const data = {
+    action: 'editDriverMovement',
+    vanNo: driverVanNo,
+    editType: movementEditType,
+    timestamp: new Date(rawTime).toISOString()
+  };
+  if (isIn) data.branch = document.getElementById('editCheckInBranch').value;
+  else data.nextBranch = document.getElementById('editCheckOutBranch').value;
+  const btn = document.getElementById('saveMovementEditBtn');
+  btn.disabled = true;
+  try {
+    const res = await apiPost(data);
+    if (!res.success) return toast(res.error || 'Edit rejected', 'bad');
+    driverState = res.state || driverState;
+    cacheDriverState();
+    closeMovementEditor();
+    renderDriverState();
+    toast(res.message || 'Movement updated', 'ok');
+  } catch(e) {
+    toast('Network error while saving edit', 'bad');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function driverCheckIn() {
   if (!driverState || normalizedDriverStatus(driverState) !== 'MOVING') return;
   driverDoCheckIn(driverState.nextBranch);
@@ -845,7 +993,7 @@ async function driverDoCheckIn(branch) {
   setDriverServerStatus('Saved on this phone. Upload pending…', 'pending');
   toast('Check-in saved on phone', 'ok');
   await flushDriverOutbox();
-  loadVanBoard();
+  if (vanBoardLoaded) pollTrackedLiveVans();
 }
 
 async function driverDoCheckOut(nextBranch) {
@@ -863,7 +1011,7 @@ async function driverDoCheckOut(nextBranch) {
   setDriverServerStatus('Saved on this phone. Upload pending…', 'pending');
   toast('Check-out saved on phone', 'ok');
   await flushDriverOutbox();
-  loadVanBoard();
+  if (vanBoardLoaded) pollTrackedLiveVans();
 }
 
 async function submitDriverIssue() {
@@ -875,12 +1023,6 @@ async function submitDriverIssue() {
     toast(res.message || res.error, res.success ? 'ok' : 'bad');
     if (res.success) input.value = '';
   } catch(e) { toast('Network error', 'bad'); }
-}
-
-function editVanNo() {
-  document.getElementById('vanNoCard').classList.remove('hidden');
-  document.getElementById('driverVanNoInput').value = driverVanNo;
-  document.getElementById('driverVanNoInput').focus();
 }
 
 /* ===================== ANNOUNCEMENTS & CONTACTS ===================== */
