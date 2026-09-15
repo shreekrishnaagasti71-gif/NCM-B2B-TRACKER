@@ -122,7 +122,7 @@ body.driver-portal .nav-tab{display:block;width:100%}
     <div class="nav-tabs">
       <div class="nav-tab active" id="mainNavTab" onclick="showTab('main')">-</div>
       <div class="nav-tab branch-nav-tab" id="secondNavTab" onclick="showTab('second')">Contacts</div>
-      <div class="nav-tab company-nav-tab" id="allVansNavTab" onclick="showTab('vans')">All Vans</div>
+      <div class="nav-tab company-nav-tab" id="allVansNavTab" onclick="showTab('vans')">Live Vans</div>
     </div>
 
     <!-- ============ MAIN TAB: ANNOUNCEMENTS (branch) / CHECK IN-OUT (driver) / ADMIN ============ -->
@@ -236,7 +236,7 @@ body.driver-portal .nav-tab{display:block;width:100%}
     <!-- ============ THIRD TAB: ALL VANS ============ -->
     <div id="vansTab" class="hidden">
       <div class="card">
-        <h4>🚐 All Vans — Live Company Board</h4>
+        <h4>🚐 Live Vans — Company Board</h4>
         <div id="vanBoardList"><div style="font-size:13px;color:#94a3b8;text-align:center;padding:8px">Loading…</div></div>
       </div>
     </div>
@@ -273,7 +273,7 @@ body.driver-portal .nav-tab{display:block;width:100%}
 <div class="build-tag" id="buildTag"></div>
 
 <script>
-const APP_VERSION = "v26-split-portals";
+const APP_VERSION = "v27-live-write-path";
 let SCRIPT_URL = localStorage.getItem('ncm_url') || "";
 let currentBranch = "";
 let currentRole = "";
@@ -693,7 +693,7 @@ async function loadVanBoard() {
   if (vanBoardInFlight) return;
   vanBoardInFlight = true;
   try {
-    const res = await apiGet({ action: 'getVanBoard' });
+    const res = await apiGet({ action: 'getLiveVanBoard' });
     if (!res.success) return;
     const vans = res.data || [];
     vanBoardData = vans;
@@ -1053,6 +1053,7 @@ async function saveMovementEdit() {
     editType: movementEditType,
     timestamp: new Date(rawTime).toISOString()
   };
+  data.portal = 'driver';
   if (isIn) data.branch = document.getElementById('editCheckInBranch').value;
   else data.nextBranch = document.getElementById('editCheckOutBranch').value;
   const btn = document.getElementById('saveMovementEditBtn');
@@ -1088,7 +1089,7 @@ async function driverDoCheckIn(branch) {
   driverPollBlockedUntil = Date.now() + 2500;
   driverState = { vanNo: driverVanNo, started: true, branch: branch, nextBranch: null, status: 'AT_STATION', elapsedSeconds: 0, round: (previous && previous.round) || 1 };
   cacheDriverState();
-  queueDriverOperation('driverCheckIn', { action: 'driverCheckIn', vanNo: driverVanNo, branch: branch });
+  queueDriverOperation('driverCheckIn', { action: 'driverCheckIn', portal: 'driver', vanNo: driverVanNo, branch: branch });
   document.getElementById('branchPickBox').classList.add('hidden');
   renderDriverState();
   setDriverServerStatus('Saved on this phone. Upload pending…', 'pending');
@@ -1104,7 +1105,7 @@ async function driverDoCheckOut(nextBranch) {
   driverState = { vanNo: driverVanNo, started: true, branch: atBranch, nextBranch: nextBranch, status: 'MOVING', elapsedSeconds: 0, round: previous.round || 1 };
   cacheDriverState();
   queueDriverOperation('driverCheckOut', {
-    action: 'driverCheckOut', vanNo: driverVanNo,
+    action: 'driverCheckOut', portal: 'driver', vanNo: driverVanNo,
     fromBranch: atBranch, nextBranch: nextBranch
   });
   document.getElementById('branchPickBox').classList.add('hidden');
