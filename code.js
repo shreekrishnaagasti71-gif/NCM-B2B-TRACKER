@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-//  NCM B2B TRACKER — BACKEND v10 (fast live board, no shipments)
+//  NCM B2B TRACKER — BACKEND v11 (split portals, fast live board)
 //  This version REMOVES the whole Send/Receive shipment
 //  system and the "SHIPMENT GPS" sheet. The app is now:
 //    • Driver check-in / check-out with round detection + controlled edits
@@ -246,7 +246,8 @@ function ensureLiveSheetToday_() {
       syncLiveRow_(vanNo, item.values, item.rowIndex);
     });
   }
-  setCached_(marker, '1', 300);
+  // The migration check is once per day, not once per few minutes.
+  setCached_(marker, '1', 21600);
   } finally {
     migrationLock.releaseLock();
   }
@@ -307,6 +308,11 @@ function getDriverState(vanNo) {
   }
   var state;
   var live = liveRowValues_(vanKey);
+  if (!live) {
+    // Migrate legacy rows once, not once per driver request.
+    ensureLiveSheetToday_();
+    live = liveRowValues_(vanKey);
+  }
   if (live && normalizeDateStr(live[LIVE_COL.DATE - 1]) === today()) {
     state = {
       vanNo: String(live[LIVE_COL.VAN - 1]).trim(),
@@ -348,7 +354,7 @@ function getDriverState(vanNo) {
       syncLiveRow_(vanKey, v, item.rowIndex);
     }
   }
-  setCached_(cacheKey, JSON.stringify(state), DRIVER_STATE_TTL);
+  setCached_(cacheKey, JSON.stringify(state), state.started ? DRIVER_STATE_TTL : 60);
   return state;
 }
 
@@ -378,7 +384,6 @@ function handleDriverCheckIn(data) {
     var sheet = getMovementSheet();
     var state = getDriverState(vanNo);
     var now = new Date();
-    var priorRows = movementRowsForToday(vanNo);
 
     if (!state.started) {
       var info0 = computeRoundInfo([], branch);
@@ -407,6 +412,9 @@ function handleDriverCheckIn(data) {
       return { success:false, error:"Check-in opens after 2 minutes of travel" };
     }
 
+    // Round detection is only needed when completing a moving leg. Avoid
+    // scanning the history sheet for the common first check-in/check-out path.
+    var priorRows = movementRowsForToday(vanNo);
     var values = sheet.getRange(state.rowIndex, 1, 1, MOVE_COL.UPDATED).getValues()[0];
     values[MOVE_COL.TRAVEL_SECONDS - 1] = travelSeconds;
     values[MOVE_COL.TRAVEL_TIME - 1] = timeLabel(travelSeconds);
@@ -804,7 +812,11 @@ function doGet(e) {
   }
 
   if (action === "getDriverState") {
-    return jsonResponse({ success:true, state:driverStateResponse(getDriverState(e.parameter.vanNo)) });
+    try {
+      return jsonResponse({ success:true, state:driverStateResponse(getDriverState(e.parameter.vanNo)) });
+    } catch (err) {
+      return jsonResponse({ success:false, error:"Driver state temporarily unavailable" });
+    }
   }
   if (action === "getDestinations") {
     var requestedBranch = String(e.parameter.branch || "").toUpperCase().trim();
@@ -834,15 +846,19 @@ function doPost(e) {
   try { body = JSON.parse(e.postData.contents); }
   catch (err) { return jsonResponse({ success: false, error: "Bad JSON" }); }
 
-  switch (body.action) {
-    case 'driverCheckIn':     return jsonResponse(handleDriverCheckIn(body));
-    case 'driverCheckOut':    return jsonResponse(handleDriverCheckOut(body));
-    case 'editDriverMovement':return jsonResponse(handleEditDriverMovement(body));
-    case 'submitIssue':       return jsonResponse(submitIssue(body));
-    case 'putAnnouncement':   return jsonResponse(handlePutAnnouncement(body));
-    case 'saveBranchContact': return jsonResponse(handleSaveBranchContact(body));
-    case 'closeIssue':        return jsonResponse(closeIssue(body.row));
-    default:                  return jsonResponse({ success: false, error: 'Unknown action' });
+  try {
+    switch (body.action) {
+      case 'driverCheckIn':     return jsonResponse(handleDriverCheckIn(body));
+      case 'driverCheckOut':    return jsonResponse(handleDriverCheckOut(body));
+      case 'editDriverMovement':return jsonResponse(handleEditDriverMovement(body));
+      case 'submitIssue':       return jsonResponse(submitIssue(body));
+      case 'putAnnouncement':   return jsonResponse(handlePutAnnouncement(body));
+      case 'saveBranchContact': return jsonResponse(handleSaveBranchContact(body));
+      case 'closeIssue':        return jsonResponse(closeIssue(body.row));
+      default:                  return jsonResponse({ success: false, error: 'Unknown action' });
+    }
+  } catch (err) {
+    return jsonResponse({ success:false, retryable:true, error:"Server temporarily busy. Please retry." });
   }
 }
 
